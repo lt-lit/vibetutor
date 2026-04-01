@@ -3,7 +3,8 @@
  * Renders panels and handles user interactions.
  */
 
-import { searchCards, autocomplete, lookupCard } from './scryfall.js';
+import { searchCards, autocomplete, lookupCard, bulkLookup, parseDecklistText } from './scryfall.js';
+import { exportPlain, exportMoxfield, exportArena } from './export.js';
 
 /** Track which panels have been initialized to avoid re-rendering on every state change */
 const initialized = new Set();
@@ -259,13 +260,522 @@ function updateStrategyDisplay(el, state) {
 }
 
 // ============================================================
-// DECK PANEL (stub — Session 4)
+// DECK PANEL
 // ============================================================
+
+/** Deck panel view preferences (ephemeral, not persisted) */
+let deckViewMode = 'stacks'; // 'stacks' | 'grid'
+let deckGrouping = 'tag';    // 'tag' | 'type' | 'cmc' | 'none'
+const collapsedGroups = new Set();
+
+/** Stored handlers reference for event delegation */
+let _deckHandlers = null;
+/** Stored state reference for event delegation */
+let _deckState = null;
 
 export function renderDeckPanel(state, handlers) {
   const el = document.getElementById('deck-panel');
-  if (!el || initialized.has('deck')) return;
-  el.innerHTML = '<div class="empty-state">Your deck will appear here</div>';
+  if (!el) return;
+
+  _deckHandlers = handlers;
+  _deckState = state;
+
+  if (!initialized.has('deck')) {
+    initialized.add('deck');
+    buildDeckPanel(el, state, handlers);
+  }
+
+  updateDeckDisplay(el, state);
+}
+
+function buildDeckPanel(el, state, handlers) {
+  el.innerHTML = `
+    <div class="deck-content">
+      <div id="deck-commander" class="deck-commander-display"></div>
+
+      <div class="deck-toolbar">
+        <div class="deck-search-wrapper relative">
+          <input type="text" id="deck-search" class="input" placeholder="Add a card..." autocomplete="off">
+          <div id="deck-search-dropdown" class="dropdown" hidden></div>
+        </div>
+        <div class="deck-toolbar-actions">
+          <div class="segmented-control deck-view-toggle" id="deck-view-toggle">
+            <button data-view="stacks" class="active">Stacks</button>
+            <button data-view="grid">Grid</button>
+          </div>
+          <div class="segmented-control deck-grouping-toggle" id="deck-grouping-toggle">
+            <button data-group="tag" class="active">Tag</button>
+            <button data-group="type">Type</button>
+            <button data-group="cmc">CMC</button>
+            <button data-group="none">All</button>
+          </div>
+          <button class="btn btn-sm" id="deck-import-btn">Import</button>
+          <div class="relative">
+            <button class="btn btn-sm" id="deck-export-btn">Export</button>
+          </div>
+          <button class="btn btn-sm btn-primary" id="deck-autotag-btn">Auto-Tag</button>
+        </div>
+      </div>
+
+      <div id="deck-cards"></div>
+    </div>
+  `;
+
+  // --- Card search autocomplete ---
+  const searchInput = el.querySelector('#deck-search');
+  const searchDropdown = el.querySelector('#deck-search-dropdown');
+
+  const doCardSearch = debounce(async (query) => {
+    if (query.length < 2) { searchDropdown.hidden = true; return; }
+    const names = await autocomplete(query);
+    if (names.length === 0) { searchDropdown.hidden = true; return; }
+    searchDropdown.innerHTML = names.slice(0, 8).map(name =>
+      `<div class="dropdown-item" data-name="${escapeAttr(name)}"><span>${escapeHtml(name)}</span></div>`
+    ).join('');
+    searchDropdown.hidden = false;
+  }, 300);
+
+  searchInput.addEventListener('input', (e) => doCardSearch(e.target.value.trim()));
+  searchInput.addEventListener('blur', () => setTimeout(() => { searchDropdown.hidden = true; }, 200));
+
+  searchDropdown.addEventListener('click', async (e) => {
+    const item = e.target.closest('.dropdown-item');
+    if (!item) return;
+    const name = item.dataset.name;
+    searchDropdown.hidden = true;
+    searchInput.value = '';
+    const card = await lookupCard(name);
+    if (card && handlers.onAddCard) handlers.onAddCard(card);
+  });
+
+  // --- View toggle ---
+  el.querySelector('#deck-view-toggle').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-view]');
+    if (!btn) return;
+    deckViewMode = btn.dataset.view;
+    el.querySelectorAll('#deck-view-toggle button').forEach(b =>
+      b.classList.toggle('active', b.dataset.view === deckViewMode));
+    updateDeckDisplay(el, _deckState);
+  });
+
+  // --- Grouping toggle ---
+  el.querySelector('#deck-grouping-toggle').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-group]');
+    if (!btn) return;
+    deckGrouping = btn.dataset.group;
+    el.querySelectorAll('#deck-grouping-toggle button').forEach(b =>
+      b.classList.toggle('active', b.dataset.group === deckGrouping));
+    collapsedGroups.clear();
+    updateDeckDisplay(el, _deckState);
+  });
+
+  // --- Import ---
+  el.querySelector('#deck-import-btn').addEventListener('click', () => {
+    showImportModal(handlers);
+  });
+
+  // --- Export ---
+  el.querySelector('#deck-export-btn').addEventListener('click', (e) => {
+    showExportDropdown(e.target.closest('.relative'), _deckState);
+  });
+
+  // --- Auto-Tag ---
+  el.querySelector('#deck-autotag-btn').addEventListener('click', async () => {
+    if (handlers.onAutoTag) {
+      const btn = el.querySelector('#deck-autotag-btn');
+      btn.disabled = true;
+      btn.textContent = 'Tagging...';
+      await handlers.onAutoTag();
+      btn.disabled = false;
+      btn.textContent = 'Auto-Tag';
+    }
+  });
+
+  // --- Event delegation on cards container ---
+  el.querySelector('#deck-cards').addEventListener('click', (e) => {
+    // Stack header collapse/expand
+    const stackHeader = e.target.closest('.card-stack-header');
+    if (stackHeader) {
+      const group = stackHeader.dataset.group;
+      const items = stackHeader.nextElementSibling;
+      const arrow = stackHeader.querySelector('.section-arrow');
+      if (collapsedGroups.has(group)) {
+        collapsedGroups.delete(group);
+        items.hidden = false;
+        arrow.textContent = '\u25BC';
+      } else {
+        collapsedGroups.add(group);
+        items.hidden = true;
+        arrow.textContent = '\u25B6';
+      }
+      return;
+    }
+
+    // Remove card
+    const removeBtn = e.target.closest('.card-remove-btn');
+    if (removeBtn) {
+      e.stopPropagation();
+      const cardName = removeBtn.dataset.card;
+      if (cardName && _deckHandlers.onRemoveCard) _deckHandlers.onRemoveCard(cardName);
+      return;
+    }
+
+    // Tag badge click — open tag editor
+    const tagBadge = e.target.closest('.tag-badge[data-card]');
+    if (tagBadge) {
+      e.stopPropagation();
+      openTagEditor(tagBadge, tagBadge.dataset.card, _deckState, _deckHandlers);
+      return;
+    }
+
+    // Card image click — show overlay
+    const cardItem = e.target.closest('.card-stack-item, .deck-grid-item');
+    if (cardItem) {
+      const img = cardItem.querySelector('img');
+      if (img && img.src) showCardOverlay(img.src, cardItem.dataset.card);
+    }
+  });
+}
+
+function updateDeckDisplay(el, state) {
+  // Update commander display
+  const cmdEl = el.querySelector('#deck-commander');
+  if (cmdEl) {
+    if (state.commander) {
+      cmdEl.innerHTML = `<img src="${state.commander.imageUris?.normal || ''}" alt="${escapeAttr(state.commander.name)}" loading="lazy">`;
+      cmdEl.hidden = false;
+    } else {
+      cmdEl.innerHTML = '';
+      cmdEl.hidden = true;
+    }
+  }
+
+  // Update cards display
+  const cardsEl = el.querySelector('#deck-cards');
+  if (!cardsEl) return;
+
+  if (state.cards.length === 0) {
+    cardsEl.innerHTML = '<div class="empty-state">Add cards using the search above, or import a decklist</div>';
+    return;
+  }
+
+  const groups = groupCards(state.cards, deckGrouping);
+
+  if (deckViewMode === 'stacks') {
+    cardsEl.innerHTML = groups.map(g => renderStackGroup(g)).join('');
+  } else {
+    cardsEl.innerHTML = groups.map(g => renderGridGroup(g)).join('');
+  }
+}
+
+function renderStackGroup({ label, cards }) {
+  const isCollapsed = collapsedGroups.has(label);
+  const arrow = isCollapsed ? '\u25B6' : '\u25BC';
+  return `
+    <div class="card-stack" data-group="${escapeAttr(label)}">
+      <div class="card-stack-header" data-group="${escapeAttr(label)}">
+        <span class="section-arrow">${arrow}</span>
+        <span>${escapeHtml(label)}</span>
+        <span class="stack-count">(${cards.length})</span>
+      </div>
+      <div class="card-stack-items" ${isCollapsed ? 'hidden' : ''}>
+        ${cards.map(c => {
+          const imgUrl = c.scryfallData?.imageUris?.normal || '';
+          const tag = c.tag || 'untagged';
+          return `
+            <div class="card-stack-item" data-card="${escapeAttr(c.name)}">
+              <img src="${imgUrl}" alt="${escapeAttr(c.name)}" loading="lazy">
+              <div class="stack-item-overlay">
+                <span class="tag-badge" data-card="${escapeAttr(c.name)}">${escapeHtml(tag)}</span>
+                <button class="card-remove-btn" data-card="${escapeAttr(c.name)}">&times;</button>
+              </div>
+            </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+}
+
+function renderGridGroup({ label, cards }) {
+  const isCollapsed = collapsedGroups.has(label);
+  const arrow = isCollapsed ? '\u25B6' : '\u25BC';
+  return `
+    <div class="card-stack" data-group="${escapeAttr(label)}">
+      <div class="card-stack-header" data-group="${escapeAttr(label)}">
+        <span class="section-arrow">${arrow}</span>
+        <span>${escapeHtml(label)}</span>
+        <span class="stack-count">(${cards.length})</span>
+      </div>
+      <div class="card-grid" ${isCollapsed ? 'hidden' : ''}>
+        ${cards.map(c => {
+          const imgUrl = c.scryfallData?.imageUris?.normal || '';
+          const tag = c.tag || 'untagged';
+          return `
+            <div class="deck-grid-item" data-card="${escapeAttr(c.name)}">
+              <img src="${imgUrl}" alt="${escapeAttr(c.name)}" loading="lazy">
+              <div class="grid-item-overlay">
+                <span class="tag-badge" data-card="${escapeAttr(c.name)}">${escapeHtml(tag)}</span>
+                <button class="card-remove-btn" data-card="${escapeAttr(c.name)}">&times;</button>
+              </div>
+            </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+}
+
+// ============================================================
+// GROUPING HELPER
+// ============================================================
+
+const TYPE_ORDER = ['Creature', 'Instant', 'Sorcery', 'Enchantment', 'Artifact', 'Planeswalker', 'Land', 'Other'];
+
+function groupCards(cards, grouping) {
+  const groups = new Map();
+
+  for (const card of cards) {
+    let key;
+    switch (grouping) {
+      case 'tag':
+        key = card.tag || 'Untagged';
+        break;
+      case 'type':
+        key = extractPrimaryType(card.scryfallData?.typeLine || '');
+        break;
+      case 'cmc': {
+        const cmc = Math.floor(card.scryfallData?.cmc ?? 0);
+        key = cmc >= 7 ? '7+' : String(cmc);
+        break;
+      }
+      default:
+        key = 'All Cards';
+    }
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(card);
+  }
+
+  // Sort groups
+  let sortedKeys;
+  switch (grouping) {
+    case 'tag':
+      sortedKeys = [...groups.keys()].sort((a, b) => {
+        if (a === 'Untagged') return 1;
+        if (b === 'Untagged') return -1;
+        return a.localeCompare(b);
+      });
+      break;
+    case 'type':
+      sortedKeys = TYPE_ORDER.filter(t => groups.has(t));
+      break;
+    case 'cmc':
+      sortedKeys = ['0', '1', '2', '3', '4', '5', '6', '7+'].filter(k => groups.has(k));
+      break;
+    default:
+      sortedKeys = [...groups.keys()];
+  }
+
+  return sortedKeys.map(key => ({ label: key, cards: groups.get(key) }));
+}
+
+function extractPrimaryType(typeLine) {
+  const lower = typeLine.toLowerCase();
+  if (lower.includes('creature')) return 'Creature';
+  if (lower.includes('instant')) return 'Instant';
+  if (lower.includes('sorcery')) return 'Sorcery';
+  if (lower.includes('enchantment')) return 'Enchantment';
+  if (lower.includes('artifact')) return 'Artifact';
+  if (lower.includes('planeswalker')) return 'Planeswalker';
+  if (lower.includes('land')) return 'Land';
+  return 'Other';
+}
+
+// ============================================================
+// TAG EDITOR
+// ============================================================
+
+function openTagEditor(anchorEl, cardName, state, handlers) {
+  // Remove any existing tag editor
+  document.querySelectorAll('.tag-editor').forEach(e => e.remove());
+
+  const existingTags = [...new Set(state.cards.map(c => c.tag).filter(Boolean))].sort();
+  const currentTag = state.cards.find(c => c.name === cardName)?.tag;
+
+  const editor = document.createElement('div');
+  editor.className = 'tag-editor';
+  editor.innerHTML = `
+    ${existingTags.map(tag =>
+      `<div class="tag-editor-item ${tag === currentTag ? 'active' : ''}" data-tag="${escapeAttr(tag)}">${escapeHtml(tag)}</div>`
+    ).join('')}
+    <div class="tag-editor-item" data-tag="">untagged</div>
+    <div class="tag-editor-input">
+      <input type="text" placeholder="New tag..." autocomplete="off">
+    </div>
+  `;
+
+  // Position relative to anchor
+  anchorEl.style.position = 'relative';
+  anchorEl.appendChild(editor);
+
+  // Handle tag selection
+  editor.addEventListener('click', (e) => {
+    const item = e.target.closest('.tag-editor-item');
+    if (!item) return;
+    const newTag = item.dataset.tag || null;
+    if (handlers.onTagChange) handlers.onTagChange(cardName, newTag);
+    editor.remove();
+  });
+
+  // Handle new tag input
+  const input = editor.querySelector('input');
+  input.focus();
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && input.value.trim()) {
+      const newTag = input.value.trim().toLowerCase();
+      if (handlers.onTagChange) handlers.onTagChange(cardName, newTag);
+      editor.remove();
+    }
+    if (e.key === 'Escape') editor.remove();
+  });
+
+  // Close on click outside
+  setTimeout(() => {
+    const closeHandler = (e) => {
+      if (!editor.contains(e.target)) {
+        editor.remove();
+        document.removeEventListener('click', closeHandler);
+      }
+    };
+    document.addEventListener('click', closeHandler);
+  }, 0);
+}
+
+// ============================================================
+// IMPORT MODAL
+// ============================================================
+
+function showImportModal(handlers) {
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.innerHTML = `
+    <div class="modal">
+      <h2>Import Decklist</h2>
+      <textarea class="input" id="import-textarea" rows="10"
+                placeholder="Paste your decklist here...&#10;&#10;Supported formats:&#10;1 Sol Ring&#10;1x Lightning Greaves&#10;Card Name&#10;1 Card Name (SET) 123"></textarea>
+      <div id="import-results" class="import-results" hidden></div>
+      <div class="action-buttons mt-md">
+        <button class="btn" id="import-cancel">Cancel</button>
+        <button class="btn btn-primary" id="import-submit">Import</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+
+  // Cancel
+  backdrop.querySelector('#import-cancel').addEventListener('click', () => backdrop.remove());
+  backdrop.addEventListener('click', (e) => {
+    if (e.target === backdrop) backdrop.remove();
+  });
+
+  // Submit
+  backdrop.querySelector('#import-submit').addEventListener('click', async () => {
+    const textarea = backdrop.querySelector('#import-textarea');
+    const text = textarea.value.trim();
+    if (!text) return;
+
+    const resultsEl = backdrop.querySelector('#import-results');
+    const submitBtn = backdrop.querySelector('#import-submit');
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Importing...';
+    resultsEl.hidden = false;
+    resultsEl.innerHTML = '<div class="import-loading">Looking up cards...</div>';
+
+    const entries = parseDecklistText(text);
+    const names = entries.map(e => e.name);
+    const found = await bulkLookup(names);
+    const foundNames = new Set(found.map(c => c.name));
+    const notFound = names.filter(n => !foundNames.has(n));
+
+    if (found.length > 0 && handlers.onImportCards) {
+      handlers.onImportCards(found);
+    }
+
+    if (notFound.length > 0) {
+      resultsEl.innerHTML = `
+        <div class="import-found">Added ${found.length} cards</div>
+        <div class="import-missing">
+          ${notFound.length} not found:
+          <ul>${notFound.map(n => `<li>${escapeHtml(n)}</li>`).join('')}</ul>
+        </div>
+      `;
+      submitBtn.textContent = 'Done';
+      submitBtn.disabled = false;
+      submitBtn.addEventListener('click', () => backdrop.remove(), { once: true });
+    } else {
+      showToast(`Imported ${found.length} cards`);
+      backdrop.remove();
+    }
+  });
+}
+
+// ============================================================
+// EXPORT DROPDOWN
+// ============================================================
+
+function showExportDropdown(anchorEl, state) {
+  // Remove existing
+  document.querySelectorAll('.export-dropdown').forEach(e => e.remove());
+
+  const dropdown = document.createElement('div');
+  dropdown.className = 'export-dropdown';
+  dropdown.innerHTML = `
+    <div class="export-dropdown-item" data-format="moxfield">Moxfield</div>
+    <div class="export-dropdown-item" data-format="plain">Plain</div>
+    <div class="export-dropdown-item" data-format="arena">Arena</div>
+  `;
+  anchorEl.appendChild(dropdown);
+
+  dropdown.addEventListener('click', async (e) => {
+    const item = e.target.closest('.export-dropdown-item');
+    if (!item) return;
+    const format = item.dataset.format;
+    let text;
+    switch (format) {
+      case 'moxfield': text = exportMoxfield(state); break;
+      case 'arena': text = exportArena(state); break;
+      default: text = exportPlain(state);
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast('Copied to clipboard!');
+    } catch {
+      showToast('Copy failed — check browser permissions');
+    }
+    dropdown.remove();
+  });
+
+  // Close on click outside
+  setTimeout(() => {
+    const closeHandler = (e) => {
+      if (!dropdown.contains(e.target) && e.target !== anchorEl.querySelector('#deck-export-btn')) {
+        dropdown.remove();
+        document.removeEventListener('click', closeHandler);
+      }
+    };
+    document.addEventListener('click', closeHandler);
+  }, 0);
+}
+
+// ============================================================
+// HTML ESCAPE HELPERS
+// ============================================================
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function escapeAttr(str) {
+  return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;');
 }
 
 // ============================================================

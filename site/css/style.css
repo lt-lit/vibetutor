@@ -30,6 +30,8 @@
 
   --section-header-height: 48px;
   --touch-target: 44px;
+  --stack-clip-height: 35px;
+
   --transition-fast: 150ms ease;
   --transition-normal: 250ms ease;
 
@@ -680,6 +682,282 @@ select.input {
 .mb-md { margin-bottom: 16px; }
 .text-center { text-align: center; }
 .relative { position: relative; }
+
+/* ===== Deck Panel ===== */
+.deck-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.deck-commander-display {
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+.deck-commander-display img {
+  max-width: 200px;
+  border-radius: 4.75% / 3.5%;
+}
+
+.deck-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.deck-search-wrapper {
+  flex: 1;
+  min-width: 160px;
+}
+
+.deck-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.deck-view-toggle button,
+.deck-grouping-toggle button {
+  padding: 6px 10px;
+  font-size: 0.7rem;
+  min-height: 32px;
+}
+
+/* ===== Visual Stacks (Moxfield-style) ===== */
+.card-stack {
+  margin-bottom: 12px;
+}
+
+.card-stack-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  user-select: none;
+}
+
+.card-stack-header .section-arrow {
+  font-size: 0.6rem;
+}
+
+.card-stack-header .stack-count {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.card-stack-items {
+  position: relative;
+}
+
+.card-stack-item {
+  position: relative;
+  height: var(--stack-clip-height);
+  overflow: hidden;
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  transition: border-color var(--transition-fast);
+}
+
+.card-stack-item:hover {
+  border-left-color: var(--accent-secondary);
+}
+
+.card-stack-item:last-child {
+  height: auto;
+  overflow: visible;
+}
+
+.card-stack-item img {
+  width: 100%;
+  display: block;
+  border-radius: 4.75% / 3.5%;
+}
+
+.card-stack-item .stack-item-overlay {
+  position: absolute;
+  top: 0;
+  right: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: var(--stack-clip-height);
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+  z-index: 2;
+}
+
+.card-stack-item:hover .stack-item-overlay,
+.card-stack-item:last-child .stack-item-overlay {
+  opacity: 1;
+}
+
+.card-stack-item:last-child .stack-item-overlay {
+  height: auto;
+  top: 4px;
+}
+
+.card-remove-btn {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  color: var(--text-primary);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 0.9rem;
+  line-height: 1;
+  transition: background var(--transition-fast);
+}
+
+.card-remove-btn:hover {
+  background: var(--accent-danger);
+}
+
+/* ===== Deck Grid View ===== */
+.deck-grid-item {
+  position: relative;
+  cursor: pointer;
+}
+
+.deck-grid-item img {
+  width: 100%;
+  display: block;
+  border-radius: 4.75% / 3.5%;
+}
+
+.deck-grid-item .grid-item-overlay {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.deck-grid-item:hover .grid-item-overlay {
+  opacity: 1;
+}
+
+/* ===== Tag Editor ===== */
+.tag-editor {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 160px;
+  max-height: 200px;
+  overflow-y: auto;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 200;
+  padding: 4px 0;
+}
+
+.tag-editor-item {
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  color: var(--text-primary);
+  transition: background var(--transition-fast);
+}
+
+.tag-editor-item:hover {
+  background: var(--bg-hover);
+}
+
+.tag-editor-item.active {
+  color: var(--accent-secondary);
+  font-weight: 600;
+}
+
+.tag-editor-input {
+  margin: 4px 8px;
+}
+
+.tag-editor-input input {
+  width: 100%;
+  padding: 4px 8px;
+  font-size: 0.8rem;
+  font-family: var(--font-sans);
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  color: var(--text-primary);
+}
+
+.tag-editor-input input:focus {
+  outline: none;
+  border-color: var(--accent-secondary);
+}
+
+/* ===== Import Results ===== */
+.import-results {
+  margin-top: 12px;
+  font-size: 0.85rem;
+}
+
+.import-results .import-found {
+  color: var(--accent-success);
+}
+
+.import-results .import-missing {
+  color: var(--accent-warning);
+  margin-top: 8px;
+}
+
+.import-results .import-missing ul {
+  list-style: none;
+  margin-top: 4px;
+  padding-left: 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.import-loading {
+  text-align: center;
+  padding: 16px;
+  color: var(--text-muted);
+}
+
+/* ===== Export Dropdown ===== */
+.export-dropdown {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  min-width: 140px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.4);
+  z-index: 200;
+  padding: 4px 0;
+  margin-bottom: 4px;
+}
+
+.export-dropdown-item {
+  padding: 8px 12px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  color: var(--text-primary);
+  transition: background var(--transition-fast);
+}
+
+.export-dropdown-item:hover {
+  background: var(--bg-hover);
+}
 
 /* ===== Responsive ===== */
 @media (min-width: 768px) {

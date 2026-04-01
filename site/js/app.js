@@ -122,6 +122,78 @@ const handlers = {
   onApiKeyChange(key) {
     setApiKey(key);
   },
+
+  // ---- Deck handlers ----
+
+  /** Add a card to the deck */
+  onAddCard(card) {
+    if (state.cards.some(c => c.name === card.name)) {
+      ui.showToast('Card already in deck');
+      return;
+    }
+    const deckCard = {
+      name: card.name,
+      tag: null,
+      scryfallData: card,
+      aiPitch: null,
+      edhrecSynergy: null,
+      sources: ['manual'],
+    };
+    updateState({ cards: [...state.cards, deckCard] });
+    ui.showToast(`Added ${card.name}`);
+  },
+
+  /** Remove a card from the deck */
+  onRemoveCard(cardName) {
+    updateState({ cards: state.cards.filter(c => c.name !== cardName) });
+    ui.showToast('Card removed');
+  },
+
+  /** Change a card's tag */
+  onTagChange(cardName, newTag) {
+    const cards = state.cards.map(c =>
+      c.name === cardName ? { ...c, tag: newTag } : c
+    );
+    updateState({ cards });
+  },
+
+  /** Import cards from a parsed decklist */
+  onImportCards(scryfallCards) {
+    const existing = new Set(state.cards.map(c => c.name));
+    const newCards = scryfallCards
+      .filter(c => !existing.has(c.name))
+      .map(c => ({
+        name: c.name,
+        tag: null,
+        scryfallData: c,
+        aiPitch: null,
+        edhrecSynergy: null,
+        sources: ['import'],
+      }));
+    updateState({ cards: [...state.cards, ...newCards] });
+    ui.showToast(`Added ${newCards.length} cards`);
+  },
+
+  /** Auto-tag all cards via LLM */
+  async onAutoTag() {
+    if (state.cards.length === 0) {
+      ui.showToast('Add cards first');
+      return;
+    }
+    try {
+      const { autoTag } = await import('./engine.js');
+      const results = await autoTag(state);
+      const tagMap = new Map(results.map(r => [r.name, r.tag]));
+      const cards = state.cards.map(c => ({
+        ...c,
+        tag: tagMap.get(c.name) ?? c.tag,
+      }));
+      updateState({ cards });
+      ui.showToast('Cards tagged!');
+    } catch {
+      ui.showToast('Auto-tag coming soon');
+    }
+  },
 };
 
 // ============================================================
@@ -148,6 +220,9 @@ function render() {
   // Update summaries for collapsed sections
   if (state.commander) {
     updateSummary('strategy', state.commander.name);
+  }
+  if (state.cards.length > 0) {
+    updateSummary('deck', `${state.cards.length}/99 cards`);
   }
 
   // Render panels
