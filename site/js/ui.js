@@ -1117,13 +1117,200 @@ function updateConsideringDisplay(el, state) {
 }
 
 // ============================================================
-// STATS PANEL (stub — Session 7)
+// STATS PANEL
 // ============================================================
+
+const MTG_COLORS = {
+  W: { name: 'White', color: '#f9faf4' },
+  U: { name: 'Blue', color: '#0e68ab' },
+  B: { name: 'Black', color: '#555555' },
+  R: { name: 'Red', color: '#d3202a' },
+  G: { name: 'Green', color: '#00733e' },
+  C: { name: 'Colorless', color: '#9ca3a8' },
+};
 
 export function renderStatsPanel(state) {
   const el = document.getElementById('stats-panel');
-  if (!el || initialized.has('stats')) return;
-  el.innerHTML = '<div class="empty-state">Add cards to see stats</div>';
+  if (!el) return;
+
+  // Stats panel always rebuilds since it's pure data display
+  if (state.cards.length === 0) {
+    el.innerHTML = '<div class="empty-state">Add cards to see stats</div>';
+    return;
+  }
+
+  const cards = state.cards;
+  const nonLands = cards.filter(c => !c.scryfallData?.typeLine?.toLowerCase().includes('land'));
+
+  // --- Mana Curve ---
+  const cmcBuckets = [0, 0, 0, 0, 0, 0, 0, 0]; // 0-7+
+  for (const c of nonLands) {
+    const cmc = Math.min(7, Math.floor(c.scryfallData?.cmc ?? 0));
+    cmcBuckets[cmc]++;
+  }
+  const maxCmc = Math.max(1, ...cmcBuckets);
+
+  // --- Color Pips ---
+  const pipCounts = { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 };
+  for (const c of cards) {
+    const cost = c.scryfallData?.manaCost || '';
+    const pips = cost.match(/\{([WUBRGC])\}/gi) || [];
+    for (const pip of pips) {
+      const color = pip.replace(/[{}]/g, '').toUpperCase();
+      if (pipCounts[color] !== undefined) pipCounts[color]++;
+    }
+  }
+  const totalPips = Object.values(pipCounts).reduce((a, b) => a + b, 0);
+
+  // --- Conic gradient for color pie ---
+  let conicStops = '';
+  if (totalPips > 0) {
+    let cumulative = 0;
+    const entries = Object.entries(pipCounts).filter(([, v]) => v > 0);
+    conicStops = entries.map(([color, count], i) => {
+      const start = cumulative;
+      cumulative += (count / totalPips) * 360;
+      return `${MTG_COLORS[color].color} ${start}deg ${cumulative}deg`;
+    }).join(', ');
+  }
+
+  // --- Average CMC ---
+  const avgCmc = nonLands.length > 0
+    ? (nonLands.reduce((sum, c) => sum + (c.scryfallData?.cmc ?? 0), 0) / nonLands.length).toFixed(2)
+    : '0.00';
+
+  // --- Total Price ---
+  const totalPrice = cards.reduce((sum, c) => {
+    const price = parseFloat(c.scryfallData?.prices?.usd || '0');
+    return sum + price;
+  }, 0);
+
+  // --- Type Breakdown ---
+  const types = { Creature: 0, Instant: 0, Sorcery: 0, Enchantment: 0, Artifact: 0, Planeswalker: 0, Land: 0, Other: 0 };
+  for (const c of cards) {
+    const tl = (c.scryfallData?.typeLine || '').toLowerCase();
+    if (tl.includes('creature')) types.Creature++;
+    else if (tl.includes('instant')) types.Instant++;
+    else if (tl.includes('sorcery')) types.Sorcery++;
+    else if (tl.includes('enchantment')) types.Enchantment++;
+    else if (tl.includes('artifact')) types.Artifact++;
+    else if (tl.includes('planeswalker')) types.Planeswalker++;
+    else if (tl.includes('land')) types.Land++;
+    else types.Other++;
+  }
+
+  // --- Combos ---
+  const combosHtml = renderCombosSection(state);
+
+  // --- Bracket ---
+  const bracketHtml = state.combos?.bracket != null
+    ? `<div class="stat-bracket">Bracket: <strong>${state.combos.bracket}</strong></div>`
+    : '';
+
+  el.innerHTML = `
+    <div class="stats-content">
+      <div class="stats-grid">
+        <div class="stat-box">
+          <div class="stat-value">${cards.length}/99</div>
+          <div class="stat-label">Cards</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value">${avgCmc}</div>
+          <div class="stat-label">Avg CMC</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value">$${totalPrice.toFixed(0)}</div>
+          <div class="stat-label">Est. Price</div>
+        </div>
+        ${bracketHtml ? `<div class="stat-box">${bracketHtml}</div>` : ''}
+      </div>
+
+      <div class="stats-section">
+        <div class="field-label mb-sm">Mana Curve</div>
+        <div class="mana-curve">
+          ${cmcBuckets.map((count, i) => `
+            <div class="mana-curve-bar">
+              <span class="bar-count">${count || ''}</span>
+              <div class="bar" style="height:${(count / maxCmc) * 100}%"></div>
+              <span class="bar-label">${i === 7 ? '7+' : i}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      <div class="stats-section">
+        <div class="field-label mb-sm">Color Distribution</div>
+        <div class="stats-color-row">
+          ${totalPips > 0
+            ? `<div class="color-pie" style="background:conic-gradient(${conicStops})"></div>`
+            : '<div class="empty-state" style="padding:8px">No colored pips</div>'}
+          <div class="color-legend">
+            ${Object.entries(pipCounts).filter(([, v]) => v > 0).map(([color, count]) => `
+              <div class="color-legend-item">
+                <span class="color-dot" style="background:${MTG_COLORS[color].color}"></span>
+                <span>${MTG_COLORS[color].name}: ${count}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+
+      <div class="stats-section">
+        <div class="field-label mb-sm">Card Types</div>
+        <div class="type-breakdown">
+          ${Object.entries(types).filter(([, v]) => v > 0).map(([type, count]) => `
+            <div class="type-row">
+              <span>${type}</span>
+              <span class="type-count">${count}</span>
+              <div class="type-bar"><div class="type-bar-fill" style="width:${(count / cards.length) * 100}%"></div></div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      ${combosHtml}
+    </div>
+  `;
+}
+
+function renderCombosSection(state) {
+  const combos = state.combos || {};
+  const present = combos.present || [];
+  const nearMiss = combos.nearMiss || [];
+
+  if (present.length === 0 && nearMiss.length === 0) {
+    return '';
+  }
+
+  let html = '<div class="stats-section">';
+  html += '<div class="field-label mb-sm">Combos</div>';
+
+  if (present.length > 0) {
+    html += '<div class="combos-present mb-sm">';
+    html += '<div class="field-hint mb-sm" style="font-weight:600;color:var(--accent-success)">In your deck:</div>';
+    for (const combo of present) {
+      html += `<div class="combo-item">
+        <div class="combo-cards">${combo.cards.map(c => escapeHtml(c)).join(' + ')}</div>
+        <div class="combo-desc">${escapeHtml(combo.description)}</div>
+      </div>`;
+    }
+    html += '</div>';
+  }
+
+  if (nearMiss.length > 0) {
+    html += '<div class="combos-near-miss">';
+    html += '<div class="field-hint mb-sm" style="font-weight:600;color:var(--accent-warning)">1 card away:</div>';
+    for (const combo of nearMiss.slice(0, 5)) {
+      html += `<div class="combo-item">
+        <div class="combo-cards">Add <strong>${escapeHtml(combo.missingCard)}</strong> to unlock: ${combo.cards.filter(c => c !== combo.missingCard).map(c => escapeHtml(c)).join(' + ')}</div>
+        <div class="combo-desc">${escapeHtml(combo.description)}</div>
+      </div>`;
+    }
+    html += '</div>';
+  }
+
+  html += '</div>';
+  return html;
 }
 
 // ============================================================

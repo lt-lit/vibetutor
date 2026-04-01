@@ -999,6 +999,140 @@ select.input {
   margin-bottom: 16px;
 }
 
+/* ===== Stats Panel ===== */
+.stats-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.stats-grid {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.stat-box {
+  flex: 1;
+  min-width: 80px;
+  text-align: center;
+  padding: 12px 8px;
+  background: var(--bg-card);
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-color);
+}
+
+.stat-value {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--accent-secondary);
+}
+
+.stat-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+.stat-bracket {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.stat-bracket strong {
+  color: var(--accent-warning);
+  font-size: 1.3rem;
+}
+
+.stats-section {
+  padding-top: 4px;
+}
+
+.stats-color-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.color-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.color-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.color-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
+.type-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.type-row {
+  display: grid;
+  grid-template-columns: 100px 30px 1fr;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.type-count {
+  text-align: right;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.type-bar {
+  height: 8px;
+  background: var(--bg-input);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.type-bar-fill {
+  height: 100%;
+  background: var(--accent-secondary);
+  border-radius: 4px;
+  transition: width var(--transition-normal);
+}
+
+.combo-item {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.combo-item:last-child {
+  border-bottom: none;
+}
+
+.combo-cards {
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+
+.combo-desc {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
 /* ===== Responsive ===== */
 @media (min-width: 768px) {
   .card-grid {

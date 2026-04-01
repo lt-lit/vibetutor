@@ -6,7 +6,11 @@
 import { initSections, expandSection, collapseSection, updateBadge, updateSummary } from './sections.js';
 import { saveState, loadState } from './storage.js';
 import { fetchEdhrec, commanderToSlug, setApiKey, getApiKey } from './api.js';
+import { findCombos, estimateBracket } from './spellbook.js';
 import * as ui from './ui.js';
+
+/** Debounce helper for combo refresh */
+let comboRefreshTimer = null;
 
 /** Default deck state */
 function createDefaultState() {
@@ -60,9 +64,36 @@ export function getState() {
  * @param {object} updates — partial state to merge (shallow)
  */
 export function updateState(updates) {
+  const prevCardCount = state.cards.length;
   state = { ...state, ...updates };
   saveState(state);
   render();
+
+  // Refresh combos when deck changes (debounced 2s)
+  if (updates.cards && updates.cards.length !== prevCardCount) {
+    refreshCombos();
+  }
+}
+
+/** Debounced combo refresh via Commander Spellbook */
+function refreshCombos() {
+  clearTimeout(comboRefreshTimer);
+  comboRefreshTimer = setTimeout(async () => {
+    if (state.cards.length === 0) return;
+    const cardNames = state.cards.map(c => c.name);
+    const [combosResult, bracket] = await Promise.allSettled([
+      findCombos(cardNames),
+      estimateBracket(cardNames),
+    ]);
+    const combos = combosResult.status === 'fulfilled' ? combosResult.value : { present: [], nearMiss: [] };
+    const bracketVal = bracket.status === 'fulfilled' ? bracket.value : null;
+    state = {
+      ...state,
+      combos: { ...combos, bracket: bracketVal },
+    };
+    saveState(state);
+    render();
+  }, 2000);
 }
 
 /**
