@@ -1133,6 +1133,62 @@ select.input {
   margin-top: 2px;
 }
 
+/* ===== Loading Status ===== */
+.loading-status {
+  text-align: center;
+  padding: 16px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+/* ===== Error State ===== */
+.error-state {
+  text-align: center;
+  padding: 24px 16px;
+  color: var(--accent-danger);
+  font-size: 0.9rem;
+}
+
+.error-state .btn {
+  margin-top: 12px;
+}
+
+/* ===== API Key Missing Banner ===== */
+.api-key-missing {
+  text-align: center;
+  padding: 16px;
+  background: rgba(245, 166, 35, 0.1);
+  border: 1px solid var(--accent-warning);
+  border-radius: var(--border-radius);
+  color: var(--accent-warning);
+  font-size: 0.85rem;
+  margin-bottom: 12px;
+}
+
+/* ===== Animations ===== */
+.fade-in {
+  animation: fade-in var(--transition-fast);
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.card-overlay {
+  animation: fade-in var(--transition-fast);
+}
+
+/* ===== Accessibility Focus Styles ===== */
+.btn:focus-visible,
+.segmented-control button:focus-visible,
+.tag-badge:focus-visible,
+.dropdown-item:focus-visible,
+.pill:focus-visible {
+  outline: 2px solid var(--accent-secondary);
+  outline-offset: 2px;
+}
+
 /* ===== Responsive ===== */
 @media (min-width: 768px) {
   .card-grid {

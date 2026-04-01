@@ -879,8 +879,13 @@ function updateRecommendationsDisplay(el, state) {
 
   // Results
   const resultsEl = el.querySelector('#recs-results');
+  const suggestBtn = el.querySelector('#recs-suggest-btn');
+
   if (state._recsLoading) {
+    suggestBtn.disabled = true;
+    suggestBtn.textContent = 'Searching...';
     resultsEl.innerHTML = `
+      <div class="loading-status">${escapeHtml(state._recsLoadingStatus || 'Analyzing deck...')}</div>
       <div class="skeleton skeleton-card"></div>
       <div class="skeleton skeleton-card"></div>
       <div class="skeleton skeleton-card"></div>
@@ -888,8 +893,11 @@ function updateRecommendationsDisplay(el, state) {
     return;
   }
 
+  suggestBtn.disabled = false;
+  suggestBtn.textContent = state.recommendationsResults.length > 0 ? 'Suggest More' : 'Suggest';
+
   if (state._recsError) {
-    resultsEl.innerHTML = `<div class="empty-state">${escapeHtml(state._recsError)}</div>`;
+    resultsEl.innerHTML = `<div class="error-state">${escapeHtml(state._recsError)}</div>`;
     return;
   }
 

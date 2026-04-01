@@ -229,8 +229,15 @@ const handlers = {
   // ---- Recommendations handlers ----
 
   async onSuggestRecommendations(prompt) {
+    // Check API key first
+    if (!getApiKey()) {
+      ui.showToast('Add your OpenRouter API key in Strategy settings first');
+      return;
+    }
+
     updateState({
       _recsLoading: true,
+      _recsLoadingStatus: 'Analyzing deck...',
       _recsError: null,
       recommendationsResults: [],
       recommendationsPrompt: prompt,
@@ -239,20 +246,31 @@ const handlers = {
     // Add to recent prompts
     if (prompt) {
       const recent = [prompt, ...state.recentPrompts.filter(p => p !== prompt)].slice(0, 5);
-      updateState({ recentPrompts: recent });
+      updateState({ recentPrompts: recent, _recsLoading: true, _recsLoadingStatus: 'Analyzing deck...' });
     }
 
     try {
       const { suggestRecommendations } = await import('./engine.js');
+
+      // Update loading status as the engine progresses
+      setTimeout(() => {
+        if (state._recsLoading) updateState({ _recsLoading: true, _recsLoadingStatus: 'Searching 3 sources...' });
+      }, 3000);
+      setTimeout(() => {
+        if (state._recsLoading) updateState({ _recsLoading: true, _recsLoadingStatus: 'AI is choosing cards...' });
+      }, 7000);
+
       const results = await suggestRecommendations(state, prompt);
       updateState({
         recommendationsResults: results,
         _recsLoading: false,
-        iterationCount: state.iterationCount + 2, // 2 LLM calls
+        _recsLoadingStatus: null,
+        iterationCount: state.iterationCount + 2,
       });
     } catch (e) {
       updateState({
         _recsLoading: false,
+        _recsLoadingStatus: null,
         _recsError: e.message || 'Recommendation failed. Try again.',
       });
     }
@@ -311,6 +329,10 @@ const handlers = {
   async onSuggestCuts() {
     if (state.cards.length === 0) {
       ui.showToast('Add cards first');
+      return;
+    }
+    if (!getApiKey()) {
+      ui.showToast('Add your OpenRouter API key in Strategy settings first');
       return;
     }
 
