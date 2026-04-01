@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VibeTutor — MTG Deck Building Assistant</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="app-header">
+    <h1 class="app-title">VibeTutor</h1>
+    <p class="app-subtitle">AI-Powered Commander Deck Builder</p>
+  </header>
+
+  <main class="sections-container">
+
+    <!-- Strategy Section -->
+    <section class="section" id="section-strategy" data-section="strategy" data-default-expanded="true">
+      <div class="section-header" role="button" tabindex="0" aria-expanded="true" aria-controls="section-strategy-content">
+        <span class="section-arrow">&#9660;</span>
+        <span class="section-name">Strategy</span>
+        <span class="section-badge" id="strategy-badge"></span>
+        <span class="section-summary" id="strategy-summary"></span>
+      </div>
+      <div class="section-content" id="section-strategy-content">
+        <div id="strategy-panel"></div>
+      </div>
+    </section>
+
+    <!-- Deck Section -->
+    <section class="section" id="section-deck" data-section="deck" data-default-expanded="true">
+      <div class="section-header" role="button" tabindex="0" aria-expanded="true" aria-controls="section-deck-content">
+        <span class="section-arrow">&#9660;</span>
+        <span class="section-name">Deck</span>
+        <span class="section-badge" id="deck-badge">0/99</span>
+        <span class="section-summary" id="deck-summary"></span>
+      </div>
+      <div class="section-content" id="section-deck-content">
+        <div id="deck-panel"></div>
+      </div>
+    </section>
+
+    <!-- Considering Section -->
+    <section class="section collapsed" id="section-considering" data-section="considering" data-default-expanded="false">
+      <div class="section-header" role="button" tabindex="0" aria-expanded="false" aria-controls="section-considering-content">
+        <span class="section-arrow">&#9654;</span>
+        <span class="section-name">Considering</span>
+        <span class="section-badge" id="considering-badge"></span>
+        <span class="section-summary" id="considering-summary">Cards you're thinking about</span>
+      </div>
+      <div class="section-content" id="section-considering-content" hidden>
+        <div id="considering-panel"></div>
+      </div>
+    </section>
+
+    <!-- Recommendations Section -->
+    <section class="section collapsed" id="section-recommendations" data-section="recommendations" data-default-expanded="false">
+      <div class="section-header" role="button" tabindex="0" aria-expanded="false" aria-controls="section-recommendations-content">
+        <span class="section-arrow">&#9654;</span>
+        <span class="section-name">Recommendations</span>
+        <span class="section-badge" id="recommendations-badge"></span>
+        <span class="section-summary" id="recommendations-summary">AI-powered card suggestions</span>
+      </div>
+      <div class="section-content" id="section-recommendations-content" hidden>
+        <div id="recommendations-panel"></div>
+      </div>
+    </section>
+
+    <!-- Cuts Section -->
+    <section class="section collapsed" id="section-cuts" data-section="cuts" data-default-expanded="false">
+      <div class="section-header" role="button" tabindex="0" aria-expanded="false" aria-controls="section-cuts-content">
+        <span class="section-arrow">&#9654;</span>
+        <span class="section-name">Cuts</span>
+        <span class="section-badge" id="cuts-badge"></span>
+        <span class="section-summary" id="cuts-summary">Suggest cards to remove</span>
+      </div>
+      <div class="section-content" id="section-cuts-content" hidden>
+        <div id="cuts-panel"></div>
+      </div>
+    </section>
+
+    <!-- Stats Section -->
+    <section class="section" id="section-stats" data-section="stats" data-default-expanded="true">
+      <div class="section-header" role="button" tabindex="0" aria-expanded="true" aria-controls="section-stats-content">
+        <span class="section-arrow">&#9660;</span>
+        <span class="section-name">Stats</span>
+        <span class="section-badge" id="stats-badge"></span>
+        <span class="section-summary" id="stats-summary"></span>
+      </div>
+      <div class="section-content" id="section-stats-content">
+        <div id="stats-panel"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Toast container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Card overlay -->
+  <div id="card-overlay" class="card-overlay" hidden>
+    <div class="card-overlay-backdrop"></div>
+    <img class="card-overlay-image" src="" alt="Card preview">
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
