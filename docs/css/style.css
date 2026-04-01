@@ -350,6 +350,10 @@ select.input {
   padding: 24px;
 }
 
+.card-overlay[hidden] {
+  display: none;
+}
+
 .card-overlay-backdrop {
   position: absolute;
   inset: 0;
