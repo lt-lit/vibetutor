@@ -7,20 +7,77 @@
 const WORKER_URL = 'https://vibetutor-worker.YOUR_SUBDOMAIN.workers.dev';
 
 /**
- * Fetch EDHREC data for a commander.
+ * Fetch and parse EDHREC data for a commander.
+ * Extracts card recommendations with synergy scores and inclusion rates.
  * @param {string} commanderSlug — e.g. 'zedruu-the-greathearted'
- * @returns {Promise<object|null>} — parsed EDHREC data or null on failure
+ * @returns {Promise<{cardRecs: Array, loaded: boolean, lastFetched: number}|null>}
  */
 export async function fetchEdhrec(commanderSlug) {
   try {
     const resp = await fetch(`${WORKER_URL}/edhrec/commanders/${commanderSlug}`);
     if (!resp.ok) return null;
-    return await resp.json();
+    const raw = await resp.json();
+    return parseEdhrecData(raw);
   } catch (e) {
     // Graceful degradation — EDHREC is optional
     console.warn('EDHREC fetch failed:', e.message);
     return null;
   }
+}
+
+/**
+ * Parse raw EDHREC JSON into structured card recommendations.
+ * EDHREC's JSON has a `cardlists` array with sections like
+ * "newcards", "topCards", "creatures", "instants", etc.
+ * Each section contains card objects with synergy and inclusion data.
+ * @param {object} raw — raw EDHREC JSON response
+ * @returns {{cardRecs: Array, loaded: boolean, lastFetched: number}}
+ */
+function parseEdhrecData(raw) {
+  const cardRecs = [];
+  const seen = new Set();
+
+  // EDHREC structures data in cardlists
+  const cardlists = raw.cardlists || raw.container?.json_dict?.cardlists || [];
+
+  for (const section of cardlists) {
+    const cards = section.cardviews || section.cards || [];
+    for (const card of cards) {
+      const name = card.name || card.names?.[0];
+      if (!name || seen.has(name)) continue;
+      seen.add(name);
+
+      cardRecs.push({
+        name,
+        synergy: card.synergy ?? card.synergy_score ?? null,
+        inclusion: card.inclusion ?? card.num_decks_percent ?? null,
+        numDecks: card.num_decks ?? null,
+        salt: card.salt ?? null,
+        label: section.header || section.tag || '',
+      });
+    }
+  }
+
+  return {
+    cardRecs,
+    loaded: true,
+    lastFetched: Date.now(),
+  };
+}
+
+/**
+ * Generate a commander slug from a card name.
+ * E.g. "Zedruu the Greathearted" -> "zedruu-the-greathearted"
+ * @param {string} name
+ * @returns {string}
+ */
+export function commanderToSlug(name) {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
 }
 
 /**
@@ -31,7 +88,7 @@ export async function fetchEdhrec(commanderSlug) {
  * @throws {Error} on failure
  */
 export async function fetchLLM(messages, model) {
-  const apiKey = localStorage.getItem('vibetutor_api_key');
+  const apiKey = getApiKey();
   if (!apiKey) {
     throw new Error('API key required. Add your OpenRouter key in Strategy settings.');
   }

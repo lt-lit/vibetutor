@@ -9,25 +9,47 @@ const API_BASE = 'https://api.scryfall.com';
 /** In-session cache: Map<string, any> */
 const cache = new Map();
 
-/** Rate limit queue */
-let lastRequestTime = 0;
+/** Rate limit queue — ensures sequential execution with 100ms spacing */
+const requestQueue = [];
+let isProcessingQueue = false;
 const MIN_INTERVAL = 100; // ms
 
 /**
- * Rate-limited fetch wrapper.
+ * Rate-limited fetch wrapper using a sequential queue.
+ * Prevents concurrent calls from bypassing the rate limit.
  */
-async function rateLimitedFetch(url, options) {
-  const now = Date.now();
-  const wait = Math.max(0, MIN_INTERVAL - (now - lastRequestTime));
-  if (wait > 0) {
-    await new Promise(r => setTimeout(r, wait));
+function rateLimitedFetch(url, options) {
+  return new Promise((resolve, reject) => {
+    requestQueue.push({ url, options, resolve, reject });
+    processQueue();
+  });
+}
+
+async function processQueue() {
+  if (isProcessingQueue) return;
+  isProcessingQueue = true;
+
+  while (requestQueue.length > 0) {
+    const { url, options, resolve, reject } = requestQueue.shift();
+    try {
+      const resp = await fetch(url, options);
+      resolve(resp);
+    } catch (e) {
+      reject(e);
+    }
+    // Wait between requests to respect Scryfall rate limits
+    if (requestQueue.length > 0) {
+      await new Promise(r => setTimeout(r, MIN_INTERVAL));
+    }
   }
-  lastRequestTime = Date.now();
-  return fetch(url, options);
+
+  isProcessingQueue = false;
 }
 
 /**
  * Search cards with a Scryfall query string.
+ * Returns first page of results (up to 175 cards). For the engine's purposes
+ * this is plenty — the LLM selects 3-5 from the pool anyway.
  * @param {string} query — Scryfall search syntax
  * @returns {Promise<Array>} — parsed card objects
  */
@@ -37,7 +59,7 @@ export async function searchCards(query) {
 
   try {
     const resp = await rateLimitedFetch(
-      `${API_BASE}/cards/search?q=${encodeURIComponent(query)}`
+      `${API_BASE}/cards/search?q=${encodeURIComponent(query)}&order=edhrec`
     );
     if (!resp.ok) return [];
     const data = await resp.json();
