@@ -1209,6 +1209,12 @@ select.input {
     width: 250px;
   }
 
+  #recs-results {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 16px;
+  }
+
   .sections-container {
     padding: 0 16px 80px;
   }
