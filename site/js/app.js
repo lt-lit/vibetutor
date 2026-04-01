@@ -3,8 +3,9 @@
  * Initializes the app, manages deckState, and wires up panels.
  */
 
-import { initSections, expandSection, collapseSection, updateBadge } from './sections.js';
+import { initSections, expandSection, collapseSection, updateBadge, updateSummary } from './sections.js';
 import { saveState, loadState } from './storage.js';
+import { fetchEdhrec, commanderToSlug, setApiKey, getApiKey } from './api.js';
 import * as ui from './ui.js';
 
 /** Default deck state */
@@ -56,13 +57,76 @@ export function getState() {
 
 /**
  * Update state and trigger re-render + save.
- * @param {object} updates — partial state to merge
+ * @param {object} updates — partial state to merge (shallow)
  */
 export function updateState(updates) {
   state = { ...state, ...updates };
   saveState(state);
   render();
 }
+
+/**
+ * Update nested state (e.g. strategy.notes) and trigger re-render + save.
+ * @param {string} key — top-level key
+ * @param {object} updates — partial object to merge into state[key]
+ */
+function updateNestedState(key, updates) {
+  state = {
+    ...state,
+    [key]: { ...state[key], ...updates },
+  };
+  saveState(state);
+  render();
+}
+
+// ============================================================
+// EVENT HANDLERS
+// ============================================================
+
+const handlers = {
+  /** Commander selected from autocomplete dropdown */
+  onCommanderSelect(card) {
+    updateState({ commander: card });
+
+    // Collapse strategy, expand deck
+    collapseSection('strategy');
+
+    // Fetch EDHREC data in background
+    const slug = commanderToSlug(card.name);
+    fetchEdhrec(slug).then(data => {
+      if (data) {
+        updateState({ edhrecData: data });
+      }
+    });
+  },
+
+  /** User wants to change commander */
+  onCommanderChange() {
+    updateState({ commander: null });
+    ui.resetPanel('strategy');
+    render();
+    expandSection('strategy');
+  },
+
+  /** Strategy fields updated (notes, powerLevel, budgetCap) */
+  onStrategyUpdate(updates) {
+    updateNestedState('strategy', updates);
+  },
+
+  /** Settings updated (model) */
+  onSettingsUpdate(updates) {
+    updateNestedState('settings', updates);
+  },
+
+  /** API key changed */
+  onApiKeyChange(key) {
+    setApiKey(key);
+  },
+};
+
+// ============================================================
+// RENDERING
+// ============================================================
 
 /**
  * Render all panels based on current state.
@@ -81,18 +145,24 @@ function render() {
   const cutsCount = state.cutsResults.length;
   updateBadge('cuts', cutsCount > 0 ? `${cutsCount}` : '');
 
+  // Update summaries for collapsed sections
+  if (state.commander) {
+    updateSummary('strategy', state.commander.name);
+  }
+
   // Render panels
-  ui.renderStrategyPanel(state, {});
-  ui.renderDeckPanel(state, {});
-  ui.renderConsideringPanel(state, {});
-  ui.renderRecommendationsPanel(state, {});
-  ui.renderCutsPanel(state, {});
+  ui.renderStrategyPanel(state, handlers);
+  ui.renderDeckPanel(state, handlers);
+  ui.renderConsideringPanel(state, handlers);
+  ui.renderRecommendationsPanel(state, handlers);
+  ui.renderCutsPanel(state, handlers);
   ui.renderStatsPanel(state);
 }
 
-/**
- * Initialize the app.
- */
+// ============================================================
+// INITIALIZATION
+// ============================================================
+
 function init() {
   // Restore state from sessionStorage
   const saved = loadState();
@@ -103,7 +173,7 @@ function init() {
   // Initialize collapsible sections
   initSections();
 
-  // Set initial section states
+  // Set initial section states based on whether a commander is selected
   if (!state.commander) {
     expandSection('strategy');
   } else {
@@ -115,6 +185,11 @@ function init() {
   if (overlay) {
     overlay.addEventListener('click', (e) => {
       if (e.target === overlay || e.target.classList.contains('card-overlay-backdrop')) {
+        ui.hideCardOverlay();
+      }
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !overlay.hidden) {
         ui.hideCardOverlay();
       }
     });

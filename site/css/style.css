@@ -587,6 +587,80 @@ select.input {
   background: var(--bg-hover);
 }
 
+/* ===== Strategy Panel ===== */
+.strategy-content {
+  max-width: 480px;
+}
+
+.strategy-commander {
+  margin-bottom: 16px;
+}
+
+.commander-display {
+  text-align: center;
+}
+
+.commander-image {
+  max-width: 300px;
+  margin: 0 auto;
+  display: block;
+}
+
+.strategy-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.field-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.field-hint a {
+  color: var(--accent-secondary);
+  text-decoration: none;
+}
+
+.field-hint a:hover {
+  text-decoration: underline;
+}
+
+.strategy-settings {
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.settings-header {
+  font-size: 0.85rem;
+  margin-bottom: 4px;
+}
+
+.iteration-counter {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
 /* ===== Empty State ===== */
 .empty-state {
   text-align: center;
