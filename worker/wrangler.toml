@@ -5,8 +5,8 @@ compatibility_date = "2024-12-01"
 # KV namespace for caching EDHREC data
 [[kv_namespaces]]
 binding = "CACHE"
-id = "YOUR_KV_NAMESPACE_ID"
-preview_id = "YOUR_KV_PREVIEW_ID"
+id = "5cf627bc035941d39eb8295e0001c436"
+preview_id = "5cf627bc035941d39eb8295e0001c436"
 
 # Future: add OpenRouter key as secret for free tier
 # [vars]
