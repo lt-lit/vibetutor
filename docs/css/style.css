@@ -1199,6 +1199,16 @@ select.input {
     grid-template-columns: repeat(3, 1fr);
   }
 
+  #deck-cards {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .card-stack {
+    width: 250px;
+  }
+
   .sections-container {
     padding: 0 16px 80px;
   }
