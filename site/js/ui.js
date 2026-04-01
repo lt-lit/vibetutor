@@ -779,33 +779,341 @@ function escapeAttr(str) {
 }
 
 // ============================================================
-// CONSIDERING PANEL (stub — Session 6)
+// RECOMMENDATIONS PANEL
 // ============================================================
 
-export function renderConsideringPanel(state, handlers) {
-  const el = document.getElementById('considering-panel');
-  if (!el || initialized.has('considering')) return;
-  el.innerHTML = '<div class="empty-state">Cards you\'re thinking about will appear here</div>';
-}
-
-// ============================================================
-// RECOMMENDATIONS PANEL (stub — Session 6)
-// ============================================================
+/** Stored handlers/state for recommendations event delegation */
+let _recsHandlers = null;
+let _recsState = null;
 
 export function renderRecommendationsPanel(state, handlers) {
   const el = document.getElementById('recommendations-panel');
-  if (!el || initialized.has('recommendations')) return;
-  el.innerHTML = '<div class="empty-state">AI-powered card suggestions</div>';
+  if (!el) return;
+
+  _recsHandlers = handlers;
+  _recsState = state;
+
+  if (!initialized.has('recommendations')) {
+    initialized.add('recommendations');
+    buildRecommendationsPanel(el, state, handlers);
+  }
+
+  updateRecommendationsDisplay(el, state);
+}
+
+function buildRecommendationsPanel(el, state, handlers) {
+  el.innerHTML = `
+    <div class="recs-content">
+      <div class="recs-input-area">
+        <div class="flex gap-sm">
+          <input type="text" id="recs-prompt" class="input" style="flex:1"
+                 placeholder="What are you looking for? (leave blank for smart suggestions)"
+                 autocomplete="off">
+          <button class="btn btn-primary" id="recs-suggest-btn">Suggest</button>
+        </div>
+        <p class="field-hint mt-sm" id="recs-hint">Try: removal, wheel effects, budget ramp under $2, the saltiest cards available</p>
+        <div id="recs-recent-prompts" class="mt-sm"></div>
+      </div>
+      <div id="recs-results"></div>
+      <div id="recs-skipped" hidden>
+        <div class="card-stack-header" id="recs-skipped-header" style="cursor:pointer">
+          <span class="section-arrow">\u25B6</span>
+          <span>Skipped cards</span>
+          <span class="stack-count" id="recs-skipped-count"></span>
+        </div>
+        <div id="recs-skipped-list" hidden></div>
+      </div>
+    </div>
+  `;
+
+  // Suggest button
+  el.querySelector('#recs-suggest-btn').addEventListener('click', () => {
+    const prompt = el.querySelector('#recs-prompt').value.trim();
+    if (handlers.onSuggestRecommendations) handlers.onSuggestRecommendations(prompt);
+  });
+
+  // Enter key on prompt
+  el.querySelector('#recs-prompt').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      const prompt = e.target.value.trim();
+      if (handlers.onSuggestRecommendations) handlers.onSuggestRecommendations(prompt);
+    }
+  });
+
+  // Recent prompts
+  el.querySelector('#recs-recent-prompts').addEventListener('click', (e) => {
+    const pill = e.target.closest('.pill');
+    if (!pill) return;
+    el.querySelector('#recs-prompt').value = pill.dataset.prompt;
+    if (handlers.onSuggestRecommendations) handlers.onSuggestRecommendations(pill.dataset.prompt);
+  });
+
+  // Event delegation on results
+  el.querySelector('#recs-results').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-action]');
+    if (!btn) return;
+    const cardName = btn.dataset.card;
+    const action = btn.dataset.action;
+    if (action === 'add' && _recsHandlers.onAddRecommendation) _recsHandlers.onAddRecommendation(cardName);
+    if (action === 'consider' && _recsHandlers.onConsiderRecommendation) _recsHandlers.onConsiderRecommendation(cardName);
+    if (action === 'skip' && _recsHandlers.onSkipRecommendation) _recsHandlers.onSkipRecommendation(cardName);
+  });
+
+  // Skipped section toggle
+  el.querySelector('#recs-skipped-header').addEventListener('click', () => {
+    const list = el.querySelector('#recs-skipped-list');
+    const arrow = el.querySelector('#recs-skipped-header .section-arrow');
+    list.hidden = !list.hidden;
+    arrow.textContent = list.hidden ? '\u25B6' : '\u25BC';
+  });
+}
+
+function updateRecommendationsDisplay(el, state) {
+  // Recent prompts
+  const recentEl = el.querySelector('#recs-recent-prompts');
+  if (recentEl && state.recentPrompts.length > 0) {
+    recentEl.innerHTML = state.recentPrompts.map(p =>
+      `<span class="pill" data-prompt="${escapeAttr(p)}">${escapeHtml(p)}</span>`
+    ).join(' ');
+  }
+
+  // Results
+  const resultsEl = el.querySelector('#recs-results');
+  if (state._recsLoading) {
+    resultsEl.innerHTML = `
+      <div class="skeleton skeleton-card"></div>
+      <div class="skeleton skeleton-card"></div>
+      <div class="skeleton skeleton-card"></div>
+    `;
+    return;
+  }
+
+  if (state._recsError) {
+    resultsEl.innerHTML = `<div class="empty-state">${escapeHtml(state._recsError)}</div>`;
+    return;
+  }
+
+  if (state.recommendationsResults.length === 0) {
+    resultsEl.innerHTML = '';
+    return;
+  }
+
+  resultsEl.innerHTML = state.recommendationsResults.map(rec => {
+    const imgUrl = rec.scryfallData?.imageUris?.normal || '';
+    const sourceBadges = (rec.sources || []).map(s => {
+      const labels = { scryfall: 'S', edhrec: 'E', spellbook: 'C' };
+      const classes = { scryfall: 'source-scryfall', edhrec: 'source-edhrec', spellbook: 'source-spellbook' };
+      return `<span class="source-badge ${classes[s] || ''}">${labels[s] || s}</span>`;
+    }).join('');
+
+    let metaInfo = '';
+    if (rec.edhrecSynergy != null) metaInfo += `<span class="field-hint">Synergy: ${(rec.edhrecSynergy * 100).toFixed(0)}%</span> `;
+    if (rec.combosUnlocked?.length > 0) {
+      metaInfo += `<div class="combo-alert">Completes combo with: ${rec.combosUnlocked.join(', ')}</div>`;
+    }
+
+    return `
+      <div class="rec-card" data-card="${escapeAttr(rec.name)}">
+        ${imgUrl ? `<img class="card-image" src="${imgUrl}" alt="${escapeAttr(rec.name)}" loading="lazy">` : ''}
+        <div class="rec-card-info">
+          <div class="flex gap-sm" style="align-items:center;flex-wrap:wrap">
+            <span class="tag-badge">${escapeHtml(rec.tag || 'untagged')}</span>
+            ${sourceBadges}
+          </div>
+          <p class="rec-pitch">${escapeHtml(rec.pitch || '')}</p>
+          ${metaInfo}
+          <div class="action-buttons">
+            <button class="btn btn-sm btn-success" data-action="add" data-card="${escapeAttr(rec.name)}">Add</button>
+            <button class="btn btn-sm btn-warning" data-action="consider" data-card="${escapeAttr(rec.name)}">Consider</button>
+            <button class="btn btn-sm" data-action="skip" data-card="${escapeAttr(rec.name)}">Skip</button>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+
+  // Skipped list
+  const skippedContainer = el.querySelector('#recs-skipped');
+  if (state.skippedRecommendations.length > 0) {
+    skippedContainer.hidden = false;
+    el.querySelector('#recs-skipped-count').textContent = `(${state.skippedRecommendations.length})`;
+    el.querySelector('#recs-skipped-list').innerHTML = state.skippedRecommendations
+      .map(name => `<div class="field-hint" style="padding:2px 0">${escapeHtml(name)}</div>`).join('');
+  } else {
+    skippedContainer.hidden = true;
+  }
 }
 
 // ============================================================
-// CUTS PANEL (stub — Session 6)
+// CUTS PANEL
 // ============================================================
+
+let _cutsHandlers = null;
+let _cutsState = null;
 
 export function renderCutsPanel(state, handlers) {
   const el = document.getElementById('cuts-panel');
-  if (!el || initialized.has('cuts')) return;
-  el.innerHTML = '<div class="empty-state">Suggest cards to remove</div>';
+  if (!el) return;
+
+  _cutsHandlers = handlers;
+  _cutsState = state;
+
+  if (!initialized.has('cuts')) {
+    initialized.add('cuts');
+    buildCutsPanel(el, state, handlers);
+  }
+
+  updateCutsDisplay(el, state);
+}
+
+function buildCutsPanel(el, state, handlers) {
+  el.innerHTML = `
+    <div class="cuts-content">
+      <div class="text-center mb-md">
+        <button class="btn btn-primary" id="cuts-suggest-btn">Suggest Cuts</button>
+      </div>
+      <div id="cuts-results"></div>
+    </div>
+  `;
+
+  el.querySelector('#cuts-suggest-btn').addEventListener('click', () => {
+    if (handlers.onSuggestCuts) handlers.onSuggestCuts();
+  });
+
+  el.querySelector('#cuts-results').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-action]');
+    if (!btn) return;
+    const cardName = btn.dataset.card;
+    const action = btn.dataset.action;
+    if (action === 'cut' && _cutsHandlers.onCutCard) _cutsHandlers.onCutCard(cardName);
+    if (action === 'consider' && _cutsHandlers.onConsiderCut) _cutsHandlers.onConsiderCut(cardName);
+    if (action === 'keep' && _cutsHandlers.onKeepCard) _cutsHandlers.onKeepCard(cardName);
+  });
+}
+
+function updateCutsDisplay(el, state) {
+  const resultsEl = el.querySelector('#cuts-results');
+  const suggestBtn = el.querySelector('#cuts-suggest-btn');
+
+  if (state._cutsLoading) {
+    suggestBtn.disabled = true;
+    suggestBtn.textContent = 'Analyzing...';
+    resultsEl.innerHTML = `
+      <div class="skeleton skeleton-card"></div>
+      <div class="skeleton skeleton-card"></div>
+    `;
+    return;
+  }
+
+  suggestBtn.disabled = false;
+  suggestBtn.textContent = state.cutsResults.length > 0 ? 'Suggest More Cuts' : 'Suggest Cuts';
+
+  if (state._cutsError) {
+    resultsEl.innerHTML = `<div class="empty-state">${escapeHtml(state._cutsError)}</div>`;
+    return;
+  }
+
+  if (state.cutsResults.length === 0) {
+    resultsEl.innerHTML = '';
+    return;
+  }
+
+  resultsEl.innerHTML = state.cutsResults.map(cut => {
+    const imgUrl = cut.scryfallData?.imageUris?.normal || '';
+    let metaInfo = '';
+    if (cut.edhrecInclusion != null) {
+      metaInfo = `<span class="field-hint">In ${(cut.edhrecInclusion * 100).toFixed(0)}% of decks</span>`;
+    }
+
+    return `
+      <div class="rec-card" data-card="${escapeAttr(cut.name)}">
+        ${imgUrl ? `<img class="card-image" src="${imgUrl}" alt="${escapeAttr(cut.name)}" loading="lazy">` : ''}
+        <div class="rec-card-info">
+          <p class="rec-pitch">${escapeHtml(cut.reason || '')}</p>
+          ${metaInfo}
+          <div class="action-buttons">
+            <button class="btn btn-sm btn-danger" data-action="cut" data-card="${escapeAttr(cut.name)}">Cut</button>
+            <button class="btn btn-sm btn-warning" data-action="consider" data-card="${escapeAttr(cut.name)}">Consider</button>
+            <button class="btn btn-sm" data-action="keep" data-card="${escapeAttr(cut.name)}">Keep</button>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ============================================================
+// CONSIDERING PANEL
+// ============================================================
+
+let _consideringHandlers = null;
+
+export function renderConsideringPanel(state, handlers) {
+  const el = document.getElementById('considering-panel');
+  if (!el) return;
+
+  _consideringHandlers = handlers;
+
+  if (!initialized.has('considering')) {
+    initialized.add('considering');
+    buildConsideringPanel(el, state, handlers);
+  }
+
+  updateConsideringDisplay(el, state);
+}
+
+function buildConsideringPanel(el, state, handlers) {
+  el.innerHTML = `
+    <div class="considering-content">
+      <div id="considering-cards"></div>
+    </div>
+  `;
+
+  el.querySelector('#considering-cards').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-action]');
+    if (!btn) return;
+    const cardName = btn.dataset.card;
+    const action = btn.dataset.action;
+    if (action === 'add' && _consideringHandlers.onAddFromConsidering) _consideringHandlers.onAddFromConsidering(cardName);
+    if (action === 'dismiss' && _consideringHandlers.onDismissConsidering) _consideringHandlers.onDismissConsidering(cardName);
+    if (action === 'cut' && _consideringHandlers.onCutFromConsidering) _consideringHandlers.onCutFromConsidering(cardName);
+    if (action === 'keep' && _consideringHandlers.onKeepFromConsidering) _consideringHandlers.onKeepFromConsidering(cardName);
+  });
+}
+
+function updateConsideringDisplay(el, state) {
+  const cardsEl = el.querySelector('#considering-cards');
+  if (!cardsEl) return;
+
+  if (state.considering.length === 0) {
+    cardsEl.innerHTML = '<div class="empty-state">Cards you\'re thinking about will appear here</div>';
+    return;
+  }
+
+  cardsEl.innerHTML = state.considering.map(card => {
+    const imgUrl = card.scryfallData?.imageUris?.normal || '';
+    const isInDeck = card.inDeck;
+
+    const buttons = isInDeck
+      ? `<button class="btn btn-sm btn-danger" data-action="cut" data-card="${escapeAttr(card.name)}">Cut from Deck</button>
+         <button class="btn btn-sm" data-action="keep" data-card="${escapeAttr(card.name)}">Keep in Deck</button>`
+      : `<button class="btn btn-sm btn-success" data-action="add" data-card="${escapeAttr(card.name)}">Add to Deck</button>
+         <button class="btn btn-sm" data-action="dismiss" data-card="${escapeAttr(card.name)}">Dismiss</button>`;
+
+    const sourceBadges = (card.sources || []).map(s => {
+      const labels = { scryfall: 'S', edhrec: 'E', spellbook: 'C' };
+      const classes = { scryfall: 'source-scryfall', edhrec: 'source-edhrec', spellbook: 'source-spellbook' };
+      return `<span class="source-badge ${classes[s] || ''}">${labels[s] || s}</span>`;
+    }).join('');
+
+    return `
+      <div class="rec-card" data-card="${escapeAttr(card.name)}">
+        ${imgUrl ? `<img class="card-image" src="${imgUrl}" alt="${escapeAttr(card.name)}" loading="lazy">` : ''}
+        <div class="rec-card-info">
+          <div class="flex gap-sm" style="align-items:center">${sourceBadges}</div>
+          <p class="rec-pitch">${escapeHtml(card.aiText || '')}</p>
+          <div class="action-buttons">${buttons}</div>
+        </div>
+      </div>`;
+  }).join('');
 }
 
 // ============================================================

@@ -188,11 +188,197 @@ const handlers = {
         ...c,
         tag: tagMap.get(c.name) ?? c.tag,
       }));
-      updateState({ cards });
+      updateState({ cards, iterationCount: state.iterationCount + 1 });
       ui.showToast('Cards tagged!');
-    } catch {
-      ui.showToast('Auto-tag coming soon');
+    } catch (e) {
+      ui.showToast(e.message || 'Auto-tag failed');
     }
+  },
+
+  // ---- Recommendations handlers ----
+
+  async onSuggestRecommendations(prompt) {
+    updateState({
+      _recsLoading: true,
+      _recsError: null,
+      recommendationsResults: [],
+      recommendationsPrompt: prompt,
+    });
+
+    // Add to recent prompts
+    if (prompt) {
+      const recent = [prompt, ...state.recentPrompts.filter(p => p !== prompt)].slice(0, 5);
+      updateState({ recentPrompts: recent });
+    }
+
+    try {
+      const { suggestRecommendations } = await import('./engine.js');
+      const results = await suggestRecommendations(state, prompt);
+      updateState({
+        recommendationsResults: results,
+        _recsLoading: false,
+        iterationCount: state.iterationCount + 2, // 2 LLM calls
+      });
+    } catch (e) {
+      updateState({
+        _recsLoading: false,
+        _recsError: e.message || 'Recommendation failed. Try again.',
+      });
+    }
+  },
+
+  onAddRecommendation(cardName) {
+    const rec = state.recommendationsResults.find(r => r.name === cardName);
+    if (!rec) return;
+
+    // Add to deck
+    if (!state.cards.some(c => c.name === cardName)) {
+      const deckCard = {
+        name: rec.name,
+        tag: rec.tag || null,
+        scryfallData: rec.scryfallData,
+        aiPitch: rec.pitch,
+        edhrecSynergy: rec.edhrecSynergy,
+        sources: rec.sources || [],
+      };
+      updateState({
+        cards: [...state.cards, deckCard],
+        recommendationsResults: state.recommendationsResults.filter(r => r.name !== cardName),
+      });
+      ui.showToast(`Added ${cardName}`);
+    }
+  },
+
+  onConsiderRecommendation(cardName) {
+    const rec = state.recommendationsResults.find(r => r.name === cardName);
+    if (!rec) return;
+
+    const considerCard = {
+      name: rec.name,
+      scryfallData: rec.scryfallData,
+      aiText: rec.pitch,
+      source: 'recommendations',
+      inDeck: false,
+      sources: rec.sources || [],
+    };
+    updateState({
+      considering: [...state.considering, considerCard],
+      recommendationsResults: state.recommendationsResults.filter(r => r.name !== cardName),
+    });
+    ui.showToast(`${cardName} moved to Considering`);
+  },
+
+  onSkipRecommendation(cardName) {
+    updateState({
+      recommendationsResults: state.recommendationsResults.filter(r => r.name !== cardName),
+      skippedRecommendations: [...state.skippedRecommendations, cardName],
+    });
+  },
+
+  // ---- Cuts handlers ----
+
+  async onSuggestCuts() {
+    if (state.cards.length === 0) {
+      ui.showToast('Add cards first');
+      return;
+    }
+
+    updateState({ _cutsLoading: true, _cutsError: null, cutsResults: [] });
+
+    try {
+      const { suggestCuts } = await import('./engine.js');
+      const results = await suggestCuts(state);
+      updateState({
+        cutsResults: results,
+        _cutsLoading: false,
+        iterationCount: state.iterationCount + 1,
+      });
+    } catch (e) {
+      updateState({
+        _cutsLoading: false,
+        _cutsError: e.message || 'Cut analysis failed. Try again.',
+      });
+    }
+  },
+
+  onCutCard(cardName) {
+    updateState({
+      cards: state.cards.filter(c => c.name !== cardName),
+      cutsResults: state.cutsResults.filter(c => c.name !== cardName),
+    });
+    ui.showToast(`${cardName} cut from deck`);
+  },
+
+  onConsiderCut(cardName) {
+    const cut = state.cutsResults.find(c => c.name === cardName);
+    if (!cut) return;
+
+    const deckCard = state.cards.find(c => c.name === cardName);
+    const considerCard = {
+      name: cardName,
+      scryfallData: cut.scryfallData || deckCard?.scryfallData,
+      aiText: cut.reason,
+      source: 'cuts',
+      inDeck: true,
+      sources: deckCard?.sources || [],
+    };
+    updateState({
+      considering: [...state.considering, considerCard],
+      cutsResults: state.cutsResults.filter(c => c.name !== cardName),
+    });
+    ui.showToast(`${cardName} moved to Considering`);
+  },
+
+  onKeepCard(cardName) {
+    updateState({
+      cutsResults: state.cutsResults.filter(c => c.name !== cardName),
+      keptCards: [...state.keptCards, cardName],
+    });
+    ui.showToast(`${cardName} kept`);
+  },
+
+  // ---- Considering handlers ----
+
+  onAddFromConsidering(cardName) {
+    const card = state.considering.find(c => c.name === cardName);
+    if (!card) return;
+
+    if (!state.cards.some(c => c.name === cardName)) {
+      const deckCard = {
+        name: card.name,
+        tag: null,
+        scryfallData: card.scryfallData,
+        aiPitch: card.aiText,
+        edhrecSynergy: null,
+        sources: card.sources || [],
+      };
+      updateState({
+        cards: [...state.cards, deckCard],
+        considering: state.considering.filter(c => c.name !== cardName),
+      });
+      ui.showToast(`Added ${cardName} to deck`);
+    }
+  },
+
+  onDismissConsidering(cardName) {
+    updateState({
+      considering: state.considering.filter(c => c.name !== cardName),
+    });
+  },
+
+  onCutFromConsidering(cardName) {
+    updateState({
+      cards: state.cards.filter(c => c.name !== cardName),
+      considering: state.considering.filter(c => c.name !== cardName),
+    });
+    ui.showToast(`${cardName} cut from deck`);
+  },
+
+  onKeepFromConsidering(cardName) {
+    updateState({
+      considering: state.considering.filter(c => c.name !== cardName),
+    });
+    ui.showToast(`${cardName} kept in deck`);
   },
 };
 

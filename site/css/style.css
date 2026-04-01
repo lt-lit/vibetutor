@@ -959,6 +959,46 @@ select.input {
   background: var(--bg-hover);
 }
 
+/* ===== Recommendation / Cut Cards ===== */
+.rec-card {
+  margin-bottom: 16px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  overflow: hidden;
+  background: var(--bg-card);
+}
+
+.rec-card .card-image {
+  border-radius: 0;
+}
+
+.rec-card-info {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rec-pitch {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.combo-alert {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--accent-warning);
+  background: rgba(245, 166, 35, 0.1);
+  padding: 6px 10px;
+  border-radius: var(--border-radius-sm);
+  border-left: 3px solid var(--accent-warning);
+}
+
+.recs-input-area {
+  margin-bottom: 16px;
+}
+
 /* ===== Responsive ===== */
 @media (min-width: 768px) {
   .card-grid {
