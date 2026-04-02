@@ -12,6 +12,24 @@ import * as ui from './ui.js';
 /** Debounce helper for combo refresh */
 let comboRefreshTimer = null;
 
+/** Render batching — coalesce multiple updateState() calls into one render */
+let renderScheduled = false;
+let savedScrollY = null;
+let dirtyKeys = new Set();
+
+function scheduleRender() {
+  if (!renderScheduled) {
+    savedScrollY = window.scrollY;
+    renderScheduled = true;
+    queueMicrotask(() => {
+      renderScheduled = false;
+      const scrollToRestore = savedScrollY;
+      savedScrollY = null;
+      renderActual(scrollToRestore);
+    });
+  }
+}
+
 /** Default deck state */
 function createDefaultState() {
   return {
@@ -67,7 +85,8 @@ export function updateState(updates) {
   const prevCardCount = state.cards.length;
   state = { ...state, ...updates };
   saveState(state);
-  render();
+  for (const k of Object.keys(updates)) dirtyKeys.add(k);
+  scheduleRender();
 
   // Refresh combos when deck changes (debounced 2s)
   if (updates.cards && updates.cards.length !== prevCardCount) {
@@ -92,7 +111,8 @@ function refreshCombos() {
       combos: { ...combos, bracket: bracketVal },
     };
     saveState(state);
-    render();
+    dirtyKeys.add('combos');
+    scheduleRender();
   }, 2000);
 }
 
@@ -107,7 +127,8 @@ function updateNestedState(key, updates) {
     [key]: { ...state[key], ...updates },
   };
   saveState(state);
-  render();
+  dirtyKeys.add(key);
+  scheduleRender();
 }
 
 // ============================================================
@@ -132,7 +153,6 @@ const handlers = {
   onCommanderChange() {
     updateState({ commander: null });
     ui.resetPanel('deck');
-    render();
     expandSection('deck');
   },
 
@@ -469,36 +489,45 @@ const handlers = {
 /**
  * Render all panels based on current state.
  */
-function render() {
-  // Update badges
-  const cardCount = state.cards.length;
-  updateBadge('deck', `${cardCount}/99`);
+function renderActual(scrollToRestore) {
+  // Snapshot and clear dirty keys; empty set = full render (init path)
+  const dirty = dirtyKeys;
+  dirtyKeys = new Set();
+  const fullRender = dirty.size === 0;
 
-  const consideringCount = state.considering.length;
-  updateBadge('considering', consideringCount > 0 ? `${consideringCount}` : '');
-
-  const recsCount = state.recommendationsResults.length;
-  updateBadge('recommendations', recsCount > 0 ? `${recsCount}` : '');
-
-  const cutsCount = state.cutsResults.length;
-  updateBadge('cuts', cutsCount > 0 ? `${cutsCount}` : '');
-
-  // Update summaries for collapsed sections
-  if (state.commander) {
-    updateSummary('strategy', state.commander.name);
-  }
-  if (state.cards.length > 0) {
-    updateSummary('deck', `${state.cards.length}/99 cards`);
-  }
-
-  // Render panels
-  ui.renderStrategyPanel(state, handlers);
-  ui.renderDeckPanel(state, handlers);
-  ui.renderConsideringPanel(state, handlers);
-  ui.renderRecommendationsPanel(state, handlers);
-  ui.renderCutsPanel(state, handlers);
-  ui.renderStatsPanel(state);
+  // Badges and summaries always update (cheap, no innerHTML churn)
+  updateBadge('deck', `${state.cards.length}/99`);
+  updateBadge('considering', state.considering.length > 0 ? `${state.considering.length}` : '');
+  updateBadge('recommendations', state.recommendationsResults.length > 0 ? `${state.recommendationsResults.length}` : '');
+  updateBadge('cuts', state.cutsResults.length > 0 ? `${state.cutsResults.length}` : '');
+  if (state.commander) updateSummary('strategy', state.commander.name);
+  if (state.cards.length > 0) updateSummary('deck', `${state.cards.length}/99 cards`);
   ui.updateSettingsMenu(state);
+
+  // Selective panel rendering — only rebuild panels whose data changed
+  const needsStrategy = fullRender || dirty.has('commander') || dirty.has('strategy') || dirty.has('edhrecData');
+  const needsDeck = fullRender || dirty.has('cards') || dirty.has('commander') || dirty.has('strategy');
+  const needsConsidering = fullRender || dirty.has('considering');
+  const needsRecs = fullRender || dirty.has('recommendationsResults') || dirty.has('_recsLoading')
+    || dirty.has('_recsError') || dirty.has('_recsLoadingStatus') || dirty.has('recentPrompts')
+    || dirty.has('skippedRecommendations');
+  const needsCuts = fullRender || dirty.has('cutsResults') || dirty.has('_cutsLoading') || dirty.has('_cutsError');
+  const needsStats = fullRender || dirty.has('cards') || dirty.has('combos');
+
+  if (needsStrategy) ui.renderStrategyPanel(state, handlers);
+  if (needsDeck) ui.renderDeckPanel(state, handlers);
+  if (needsConsidering) ui.renderConsideringPanel(state, handlers);
+  if (needsRecs) ui.renderRecommendationsPanel(state, handlers);
+  if (needsCuts) ui.renderCutsPanel(state, handlers);
+  if (needsStats) ui.renderStatsPanel(state);
+
+  // Reinforced scroll restoration — sync + rAF to catch browser paint-phase adjustments
+  if (scrollToRestore !== null) {
+    const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+    const target = Math.min(scrollToRestore, Math.max(0, maxScroll));
+    window.scrollTo(0, target);
+    requestAnimationFrame(() => window.scrollTo(0, target));
+  }
 }
 
 // ============================================================
@@ -541,7 +570,7 @@ function init() {
   ui.initSettingsMenu(handlers, state);
 
   // Initial render
-  render();
+  renderActual(null);
 }
 
 // Boot the app when DOM is ready

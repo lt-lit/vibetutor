@@ -1,10 +1,10 @@
 /**
- * api.js — Calls to the Worker middleware
- * Handles EDHREC proxy and LLM proxy via Cloudflare Worker.
+ * api.js — API helpers
+ * EDHREC proxy via Cloudflare Worker, direct OpenRouter calls.
  */
 
 /** Worker base URL — update this when deployed */
-const WORKER_URL = 'https://vibetutor-worker.spades09.workers.dev';
+export const WORKER_URL = 'https://vibetutor-worker.spades09.workers.dev';
 
 /**
  * Fetch and parse EDHREC data for a commander.
@@ -81,7 +81,7 @@ export function commanderToSlug(name) {
 }
 
 /**
- * Send a chat completion request to OpenRouter via the Worker proxy.
+ * Send a chat completion request to OpenRouter directly.
  * @param {Array} messages — OpenAI-format message array
  * @param {string} model — model ID (e.g. 'anthropic/claude-sonnet-4')
  * @returns {Promise<object>} — parsed response
@@ -93,11 +93,11 @@ export async function fetchLLM(messages, model) {
     throw new Error('API key required. Add your OpenRouter key in Strategy settings.');
   }
 
-  const resp = await fetch(`${WORKER_URL}/llm/chat`, {
+  const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-User-API-Key': apiKey,
+      Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
       model,
