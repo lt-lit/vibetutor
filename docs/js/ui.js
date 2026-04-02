@@ -239,7 +239,10 @@ function buildDeckPanel(el, state, handlers) {
             <button class="btn btn-sm" id="deck-export-btn">Export</button>
           </div>
           <button class="btn btn-sm btn-primary" id="deck-autotag-btn">Auto-Tag</button>
-          <button class="btn btn-sm deck-mobile-cols-btn" id="deck-mobile-cols-btn" title="Toggle 2-column stacks">2-Col</button>
+          <div class="segmented-control deck-cols-toggle deck-mobile-cols-btn" id="deck-cols-toggle">
+            <button data-cols="1" class="active">1-Col</button>
+            <button data-cols="2">2-Col</button>
+          </div>
         </div>
       </div>
 
@@ -371,12 +374,18 @@ function buildDeckPanel(el, state, handlers) {
     }
   });
 
-  // --- Mobile 2-column toggle ---
-  el.querySelector('#deck-mobile-cols-btn').addEventListener('click', () => {
-    mobileDoubleColumn = !mobileDoubleColumn;
+  // --- Mobile column toggle ---
+  el.querySelector('#deck-cols-toggle').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-cols]');
+    if (!btn) return;
+    mobileDoubleColumn = btn.dataset.cols === '2';
+    el.querySelectorAll('#deck-cols-toggle button').forEach(b =>
+      b.classList.toggle('active', b.dataset.cols === btn.dataset.cols));
     const cardsEl = el.querySelector('#deck-cards');
     cardsEl.classList.toggle('mobile-two-col', mobileDoubleColumn);
-    el.querySelector('#deck-mobile-cols-btn').classList.toggle('active', mobileDoubleColumn);
+    // Also update considering panel
+    const consideringEl = document.getElementById('considering-panel');
+    if (consideringEl && _consideringState) updateConsideringDisplay(consideringEl, _consideringState);
   });
 
   // --- Event delegation on cards container ---
