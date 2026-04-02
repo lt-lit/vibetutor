@@ -805,7 +805,7 @@ select.input {
   aspect-ratio: 488 / 90;
   overflow: hidden;
   cursor: pointer;
-  border-left: 3px solid transparent;
+  border: 3px solid transparent;
   transition: border-color var(--transition-fast);
 }
 
@@ -814,7 +814,7 @@ select.input {
 }
 
 .card-stack-item:hover {
-  border-left-color: var(--accent-secondary);
+  border-color: var(--accent-secondary);
 }
 
 .card-stack-item:last-child {
@@ -827,7 +827,7 @@ select.input {
   aspect-ratio: auto;
   overflow: visible;
   z-index: 10;
-  border-left: 3px solid var(--accent-secondary);
+  border: 3px solid var(--accent-secondary);
 }
 
 .card-stack-item.expanded img {
@@ -842,25 +842,18 @@ select.input {
 
 .card-stack-item .stack-item-overlay {
   position: absolute;
-  top: 0;
+  bottom: 4px;
   right: 4px;
   display: flex;
   align-items: center;
   gap: 4px;
-  height: 100%;
   opacity: 0;
   transition: opacity var(--transition-fast);
   z-index: 2;
 }
 
-.card-stack-item:hover .stack-item-overlay,
-.card-stack-item:last-child .stack-item-overlay {
+.card-stack-item.expanded .stack-item-overlay {
   opacity: 1;
-}
-
-.card-stack-item:last-child .stack-item-overlay {
-  height: auto;
-  top: 4px;
 }
 
 .card-options-btn {
