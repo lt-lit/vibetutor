@@ -785,7 +785,7 @@ select.input {
 }
 
 .card-stack-item:not(:last-child) {
-  margin-bottom: -6px;
+  margin-bottom: -8px;
 }
 
 .card-stack-item .stack-item-overlay {
