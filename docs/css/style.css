@@ -762,11 +762,15 @@ select.input {
 
 .card-stack-item {
   position: relative;
-  aspect-ratio: 745 / 70;
+  aspect-ratio: 488 / 55;
   overflow: hidden;
   cursor: pointer;
   border-left: 3px solid transparent;
   transition: border-color var(--transition-fast);
+}
+
+.card-stack-item:not(:last-child) {
+  margin-bottom: -3.5%;
 }
 
 .card-stack-item:hover {
@@ -783,10 +787,6 @@ select.input {
   width: 100%;
   display: block;
   border-radius: 4.75% / 3.5%;
-}
-
-.card-stack-item:not(:last-child) img {
-  border-radius: 0;
 }
 
 .card-stack-item .stack-item-overlay {
