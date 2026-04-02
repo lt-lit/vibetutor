@@ -767,6 +767,7 @@ select.input {
   cursor: pointer;
   border-left: 3px solid transparent;
   transition: border-color var(--transition-fast);
+  background: #171314;
 }
 
 .card-stack-item:hover {
