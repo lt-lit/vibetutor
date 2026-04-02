@@ -42,23 +42,7 @@ export function renderStrategyPanel(state, handlers) {
 function buildStrategyPanel(el, state, handlers) {
   el.innerHTML = `
     <div class="strategy-content">
-      <!-- Commander Search -->
-      <div class="strategy-commander">
-        <label class="field-label" for="commander-search">Commander</label>
-        <div class="relative">
-          <input type="text" id="commander-search" class="input"
-                 placeholder="Search for a commander..."
-                 autocomplete="off">
-          <div id="commander-dropdown" class="dropdown" hidden></div>
-        </div>
-        <div id="commander-display" class="commander-display" hidden>
-          <img id="commander-image" class="commander-image card-image" src="" alt="">
-          <button id="commander-change" class="btn btn-sm mt-sm">Change Commander</button>
-        </div>
-      </div>
-
-      <!-- Strategy Fields (shown after commander selected) -->
-      <div id="strategy-fields" class="strategy-fields" hidden>
+      <div class="strategy-fields">
         <div class="field-group">
           <label class="field-label" for="strategy-notes">Strategy / Vibe</label>
           <textarea id="strategy-notes" class="input" rows="3"
@@ -81,91 +65,8 @@ function buildStrategyPanel(el, state, handlers) {
                  placeholder="No limit">
         </div>
       </div>
-
-      <!-- Settings -->
-      <div class="strategy-settings mt-md">
-        <div class="settings-header field-label">Settings</div>
-
-        <div class="field-group">
-          <label class="field-label" for="model-select">LLM Model</label>
-          <select id="model-select" class="input">
-            <option value="anthropic/claude-sonnet-4">Claude Sonnet 4</option>
-            <option value="anthropic/claude-haiku-4">Claude Haiku 4</option>
-            <option value="google/gemini-2.5-flash">Gemini 2.5 Flash</option>
-            <option value="openai/gpt-4o-mini">GPT-4o Mini</option>
-            <option value="openai/gpt-4o">GPT-4o</option>
-          </select>
-        </div>
-
-        <div class="field-group">
-          <label class="field-label" for="api-key-input">OpenRouter API Key</label>
-          <input type="password" id="api-key-input" class="input"
-                 placeholder="sk-or-v1-...">
-          <p class="field-hint">Required for AI features. Get one at <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a></p>
-        </div>
-
-        <div class="iteration-counter" id="iteration-counter">
-          Suggestions used: 0
-        </div>
-      </div>
     </div>
   `;
-
-  // Wire up commander search
-  const searchInput = el.querySelector('#commander-search');
-  const dropdown = el.querySelector('#commander-dropdown');
-
-  const doSearch = debounce(async (query) => {
-    if (query.length < 2) {
-      dropdown.hidden = true;
-      return;
-    }
-
-    // Search for commanders specifically
-    const results = await searchCards(`is:commander ${query}`);
-    if (results.length === 0) {
-      dropdown.hidden = true;
-      return;
-    }
-
-    dropdown.innerHTML = results.slice(0, 8).map((card, i) => `
-      <div class="dropdown-item" data-index="${i}">
-        ${card.imageUris.small ? `<img src="${card.imageUris.small}" alt="${card.name}" loading="lazy">` : ''}
-        <span>${card.name}</span>
-      </div>
-    `).join('');
-    dropdown.hidden = false;
-
-    // Store results for selection
-    dropdown._results = results.slice(0, 8);
-  }, 300);
-
-  searchInput.addEventListener('input', (e) => {
-    doSearch(e.target.value.trim());
-  });
-
-  // Close dropdown on blur (with delay for click)
-  searchInput.addEventListener('blur', () => {
-    setTimeout(() => { dropdown.hidden = true; }, 200);
-  });
-
-  // Handle commander selection
-  dropdown.addEventListener('click', (e) => {
-    const item = e.target.closest('.dropdown-item');
-    if (!item || !dropdown._results) return;
-    const index = parseInt(item.dataset.index, 10);
-    const card = dropdown._results[index];
-    if (card && handlers.onCommanderSelect) {
-      handlers.onCommanderSelect(card);
-    }
-    dropdown.hidden = true;
-    searchInput.value = '';
-  });
-
-  // Change commander button
-  el.querySelector('#commander-change').addEventListener('click', () => {
-    if (handlers.onCommanderChange) handlers.onCommanderChange();
-  });
 
   // Strategy notes
   el.querySelector('#strategy-notes').addEventListener('input', debounce((e) => {
@@ -191,41 +92,9 @@ function buildStrategyPanel(el, state, handlers) {
     }
   }, 500));
 
-  // Model selector
-  el.querySelector('#model-select').addEventListener('change', (e) => {
-    if (handlers.onSettingsUpdate) {
-      handlers.onSettingsUpdate({ model: e.target.value });
-    }
-  });
-
-  // API key
-  el.querySelector('#api-key-input').addEventListener('input', debounce((e) => {
-    if (handlers.onApiKeyChange) {
-      handlers.onApiKeyChange(e.target.value.trim());
-    }
-  }, 300));
 }
 
 function updateStrategyDisplay(el, state) {
-  const searchInput = el.querySelector('#commander-search');
-  const commanderDisplay = el.querySelector('#commander-display');
-  const commanderImage = el.querySelector('#commander-image');
-  const strategyFields = el.querySelector('#strategy-fields');
-
-  if (state.commander) {
-    // Show commander image, hide search
-    searchInput.parentElement.hidden = true;
-    commanderDisplay.hidden = false;
-    commanderImage.src = state.commander.imageUris?.normal || '';
-    commanderImage.alt = state.commander.name;
-    strategyFields.hidden = false;
-  } else {
-    // Show search, hide commander
-    searchInput.parentElement.hidden = false;
-    commanderDisplay.hidden = true;
-    strategyFields.hidden = true;
-  }
-
   // Update strategy fields (only if not focused to avoid clobbering user input)
   const notesEl = el.querySelector('#strategy-notes');
   if (notesEl && document.activeElement !== notesEl) {
@@ -244,18 +113,57 @@ function updateStrategyDisplay(el, state) {
     budgetEl.value = state.strategy.budgetCap ?? '';
   }
 
-  // Update model selector
-  const modelEl = el.querySelector('#model-select');
+}
+
+// ============================================================
+// SETTINGS MENU (gear icon dropdown)
+// ============================================================
+
+export function initSettingsMenu(handlers, state) {
+  const toggle = document.getElementById('settings-toggle');
+  const dropdown = document.getElementById('settings-dropdown');
+  if (!toggle || !dropdown) return;
+
+  toggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    dropdown.hidden = !dropdown.hidden;
+  });
+
+  // Close on outside click
+  document.addEventListener('click', (e) => {
+    if (!dropdown.contains(e.target) && e.target !== toggle) {
+      dropdown.hidden = true;
+    }
+  });
+
+  // Model selector
+  dropdown.querySelector('#settings-model').addEventListener('change', (e) => {
+    if (handlers.onSettingsUpdate) {
+      handlers.onSettingsUpdate({ model: e.target.value });
+    }
+  });
+
+  // API key
+  dropdown.querySelector('#settings-api-key').addEventListener('input', debounce((e) => {
+    if (handlers.onApiKeyChange) {
+      handlers.onApiKeyChange(e.target.value.trim());
+    }
+  }, 300));
+
+  // Initial sync
+  updateSettingsMenu(state);
+}
+
+export function updateSettingsMenu(state) {
+  const modelEl = document.getElementById('settings-model');
   if (modelEl) modelEl.value = state.settings.model;
 
-  // Update API key (only if not focused)
-  const keyEl = el.querySelector('#api-key-input');
+  const keyEl = document.getElementById('settings-api-key');
   if (keyEl && document.activeElement !== keyEl) {
     keyEl.value = localStorage.getItem('vibetutor_api_key') || '';
   }
 
-  // Update iteration counter
-  const counterEl = el.querySelector('#iteration-counter');
+  const counterEl = document.getElementById('settings-iteration-counter');
   if (counterEl) counterEl.textContent = `Suggestions used: ${state.iterationCount}`;
 }
 
@@ -263,10 +171,33 @@ function updateStrategyDisplay(el, state) {
 // DECK PANEL
 // ============================================================
 
-/** Deck panel view preferences (ephemeral, not persisted) */
-let deckViewMode = 'stacks'; // 'stacks' | 'grid'
-let deckGrouping = 'tag';    // 'tag' | 'type' | 'cmc' | 'none'
+/** Deck panel view preferences (persisted to localStorage) */
+const VIEW_PREFS_KEY = 'vibetutor_view_prefs';
+
+function loadViewPrefs() {
+  try {
+    const saved = localStorage.getItem(VIEW_PREFS_KEY);
+    if (saved) return JSON.parse(saved);
+  } catch {}
+  return null;
+}
+
+function saveViewPrefs() {
+  localStorage.setItem(VIEW_PREFS_KEY, JSON.stringify({
+    viewMode: deckViewMode,
+    grouping: deckGrouping,
+    sorting: deckSorting,
+    twoCols: mobileDoubleColumn,
+  }));
+}
+
+const prefs = loadViewPrefs();
+let deckViewMode = prefs?.viewMode || 'stacks';
+let deckGrouping = prefs?.grouping || 'tag';
+let deckSorting = prefs?.sorting || 'cmc';
 const collapsedGroups = new Set();
+
+let mobileDoubleColumn = prefs?.twoCols ?? true;
 
 /** Stored handlers reference for event delegation */
 let _deckHandlers = null;
@@ -291,7 +222,19 @@ export function renderDeckPanel(state, handlers) {
 function buildDeckPanel(el, state, handlers) {
   el.innerHTML = `
     <div class="deck-content">
-      <div id="deck-commander" class="deck-commander-display"></div>
+      <!-- Commander Search -->
+      <div id="deck-commander" class="deck-commander-section">
+        <div id="deck-commander-search" class="relative">
+          <label class="field-label" for="deck-commander-input">Commander</label>
+          <input type="text" id="deck-commander-input" class="input"
+                 placeholder="Search for a commander..." autocomplete="off">
+          <div id="deck-commander-dropdown" class="dropdown" hidden></div>
+        </div>
+        <div id="deck-commander-selected" hidden>
+          <img id="deck-commander-image" class="commander-image card-image" src="" alt="">
+          <button id="deck-commander-change" class="btn btn-sm mt-sm">Change Commander</button>
+        </div>
+      </div>
 
       <div class="deck-toolbar">
         <div class="deck-search-wrapper relative">
@@ -300,14 +243,20 @@ function buildDeckPanel(el, state, handlers) {
         </div>
         <div class="deck-toolbar-actions">
           <div class="segmented-control deck-view-toggle" id="deck-view-toggle">
-            <button data-view="stacks" class="active">Stacks</button>
-            <button data-view="grid">Grid</button>
+            <button data-view="stacks" class="${deckViewMode === 'stacks' ? 'active' : ''}">Stacks</button>
+            <button data-view="grid" class="${deckViewMode === 'grid' ? 'active' : ''}">Grid</button>
           </div>
           <div class="segmented-control deck-grouping-toggle" id="deck-grouping-toggle">
-            <button data-group="tag" class="active">Tag</button>
-            <button data-group="type">Type</button>
-            <button data-group="cmc">CMC</button>
-            <button data-group="none">All</button>
+            <button data-group="tag" class="${deckGrouping === 'tag' ? 'active' : ''}">Tag</button>
+            <button data-group="type" class="${deckGrouping === 'type' ? 'active' : ''}">Type</button>
+          </div>
+          <div class="segmented-control deck-sorting-toggle" id="deck-sorting-toggle">
+            <button data-sort="cmc" class="${deckSorting === 'cmc' ? 'active' : ''}">CMC</button>
+            <button data-sort="az" class="${deckSorting === 'az' ? 'active' : ''}">A-Z</button>
+          </div>
+          <div class="segmented-control deck-cols-toggle deck-mobile-cols-btn" id="deck-cols-toggle">
+            <button data-cols="1" class="${!mobileDoubleColumn ? 'active' : ''}">1-Col</button>
+            <button data-cols="2" class="${mobileDoubleColumn ? 'active' : ''}">2-Col</button>
           </div>
           <button class="btn btn-sm" id="deck-import-btn">Import</button>
           <div class="relative">
@@ -320,6 +269,41 @@ function buildDeckPanel(el, state, handlers) {
       <div id="deck-cards"></div>
     </div>
   `;
+
+  // --- Commander search autocomplete ---
+  const cmdSearchInput = el.querySelector('#deck-commander-input');
+  const cmdDropdown = el.querySelector('#deck-commander-dropdown');
+
+  const doCmdSearch = debounce(async (query) => {
+    if (query.length < 2) { cmdDropdown.hidden = true; return; }
+    const results = await searchCards(`is:commander ${query}`);
+    if (results.length === 0) { cmdDropdown.hidden = true; return; }
+    cmdDropdown.innerHTML = results.slice(0, 8).map((card, i) => `
+      <div class="dropdown-item" data-index="${i}">
+        ${card.imageUris.small ? `<img src="${card.imageUris.small}" alt="${card.name}" loading="lazy">` : ''}
+        <span>${card.name}</span>
+      </div>
+    `).join('');
+    cmdDropdown.hidden = false;
+    cmdDropdown._results = results.slice(0, 8);
+  }, 300);
+
+  cmdSearchInput.addEventListener('input', (e) => doCmdSearch(e.target.value.trim()));
+  cmdSearchInput.addEventListener('blur', () => setTimeout(() => { cmdDropdown.hidden = true; }, 200));
+
+  cmdDropdown.addEventListener('click', (e) => {
+    const item = e.target.closest('.dropdown-item');
+    if (!item || !cmdDropdown._results) return;
+    const index = parseInt(item.dataset.index, 10);
+    const card = cmdDropdown._results[index];
+    if (card && handlers.onCommanderSelect) handlers.onCommanderSelect(card);
+    cmdDropdown.hidden = true;
+    cmdSearchInput.value = '';
+  });
+
+  el.querySelector('#deck-commander-change').addEventListener('click', () => {
+    if (handlers.onCommanderChange) handlers.onCommanderChange();
+  });
 
   // --- Card search autocomplete ---
   const searchInput = el.querySelector('#deck-search');
@@ -353,9 +337,13 @@ function buildDeckPanel(el, state, handlers) {
     const btn = e.target.closest('button[data-view]');
     if (!btn) return;
     deckViewMode = btn.dataset.view;
+    saveViewPrefs();
     el.querySelectorAll('#deck-view-toggle button').forEach(b =>
       b.classList.toggle('active', b.dataset.view === deckViewMode));
     updateDeckDisplay(el, _deckState);
+    // Also update considering panel with same view mode
+    const consideringEl = document.getElementById('considering-panel');
+    if (consideringEl && _consideringState) updateConsideringDisplay(consideringEl, _consideringState);
   });
 
   // --- Grouping toggle ---
@@ -363,10 +351,28 @@ function buildDeckPanel(el, state, handlers) {
     const btn = e.target.closest('button[data-group]');
     if (!btn) return;
     deckGrouping = btn.dataset.group;
+    saveViewPrefs();
     el.querySelectorAll('#deck-grouping-toggle button').forEach(b =>
       b.classList.toggle('active', b.dataset.group === deckGrouping));
     collapsedGroups.clear();
+    consideringCollapsedGroups.clear();
     updateDeckDisplay(el, _deckState);
+    // Also update considering panel with same grouping
+    const consideringEl = document.getElementById('considering-panel');
+    if (consideringEl && _consideringState) updateConsideringDisplay(consideringEl, _consideringState);
+  });
+
+  // --- Sorting toggle ---
+  el.querySelector('#deck-sorting-toggle').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-sort]');
+    if (!btn) return;
+    deckSorting = btn.dataset.sort;
+    saveViewPrefs();
+    el.querySelectorAll('#deck-sorting-toggle button').forEach(b =>
+      b.classList.toggle('active', b.dataset.sort === deckSorting));
+    updateDeckDisplay(el, _deckState);
+    const consideringEl = document.getElementById('considering-panel');
+    if (consideringEl && _consideringState) updateConsideringDisplay(consideringEl, _consideringState);
   });
 
   // --- Import ---
@@ -391,6 +397,21 @@ function buildDeckPanel(el, state, handlers) {
     }
   });
 
+  // --- Mobile column toggle ---
+  el.querySelector('#deck-cols-toggle').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-cols]');
+    if (!btn) return;
+    mobileDoubleColumn = btn.dataset.cols === '2';
+    saveViewPrefs();
+    el.querySelectorAll('#deck-cols-toggle button').forEach(b =>
+      b.classList.toggle('active', b.dataset.cols === btn.dataset.cols));
+    const cardsEl = el.querySelector('#deck-cards');
+    cardsEl.classList.toggle('mobile-two-col', mobileDoubleColumn);
+    // Also update considering panel
+    const consideringEl = document.getElementById('considering-panel');
+    if (consideringEl && _consideringState) updateConsideringDisplay(consideringEl, _consideringState);
+  });
+
   // --- Event delegation on cards container ---
   el.querySelector('#deck-cards').addEventListener('click', (e) => {
     // Stack header collapse/expand
@@ -411,42 +432,45 @@ function buildDeckPanel(el, state, handlers) {
       return;
     }
 
-    // Remove card
-    const removeBtn = e.target.closest('.card-remove-btn');
-    if (removeBtn) {
+    // Card options menu
+    const optionsBtn = e.target.closest('.card-options-btn');
+    if (optionsBtn) {
       e.stopPropagation();
-      const cardName = removeBtn.dataset.card;
-      if (cardName && _deckHandlers.onRemoveCard) _deckHandlers.onRemoveCard(cardName);
+      const cardName = optionsBtn.dataset.card;
+      if (cardName) openCardOptionsMenu(optionsBtn, cardName);
       return;
     }
 
-    // Tag badge click — open tag editor
-    const tagBadge = e.target.closest('.tag-badge[data-card]');
-    if (tagBadge) {
-      e.stopPropagation();
-      openTagEditor(tagBadge, tagBadge.dataset.card, _deckState, _deckHandlers);
-      return;
-    }
-
-    // Card image click — show overlay
+    // Card image click — inline expand (stacks) or full overlay (grid)
     const cardItem = e.target.closest('.card-stack-item, .deck-grid-item');
     if (cardItem) {
-      const img = cardItem.querySelector('img');
-      if (img && img.src) showCardOverlay(img.src, cardItem.dataset.card);
+      if (cardItem.classList.contains('card-stack-item')) {
+        const wasExpanded = cardItem.classList.contains('expanded');
+        el.querySelectorAll('.card-stack-item.expanded').forEach(c => c.classList.remove('expanded'));
+        if (!wasExpanded) cardItem.classList.add('expanded');
+      } else {
+        const img = cardItem.querySelector('img');
+        if (img && img.src) showCardOverlay(img.src, cardItem.dataset.card);
+      }
     }
   });
 }
 
 function updateDeckDisplay(el, state) {
-  // Update commander display
-  const cmdEl = el.querySelector('#deck-commander');
-  if (cmdEl) {
+  // Update commander search/display toggle
+  const cmdSearch = el.querySelector('#deck-commander-search');
+  const cmdSelected = el.querySelector('#deck-commander-selected');
+  const cmdImage = el.querySelector('#deck-commander-image');
+
+  if (cmdSearch && cmdSelected) {
     if (state.commander) {
-      cmdEl.innerHTML = `<img src="${state.commander.imageUris?.normal || ''}" alt="${escapeAttr(state.commander.name)}" loading="lazy">`;
-      cmdEl.hidden = false;
+      cmdSearch.hidden = true;
+      cmdSelected.hidden = false;
+      cmdImage.src = state.commander.imageUris?.normal || '';
+      cmdImage.alt = state.commander.name;
     } else {
-      cmdEl.innerHTML = '';
-      cmdEl.hidden = true;
+      cmdSearch.hidden = false;
+      cmdSelected.hidden = true;
     }
   }
 
@@ -466,10 +490,15 @@ function updateDeckDisplay(el, state) {
   } else {
     cardsEl.innerHTML = groups.map(g => renderGridGroup(g)).join('');
   }
+
+  // Re-apply mobile 2-column class if active
+  if (mobileDoubleColumn) {
+    cardsEl.classList.add('mobile-two-col');
+  }
 }
 
-function renderStackGroup({ label, cards }) {
-  const isCollapsed = collapsedGroups.has(label);
+function renderStackGroup({ label, cards }, options = {}) {
+  const isCollapsed = (options.collapsedSet || collapsedGroups).has(label);
   const arrow = isCollapsed ? '\u25B6' : '\u25BC';
   return `
     <div class="card-stack" data-group="${escapeAttr(label)}">
@@ -481,13 +510,11 @@ function renderStackGroup({ label, cards }) {
       <div class="card-stack-items" ${isCollapsed ? 'hidden' : ''}>
         ${cards.map(c => {
           const imgUrl = c.scryfallData?.imageUris?.normal || '';
-          const tag = c.tag || 'untagged';
           return `
             <div class="card-stack-item" data-card="${escapeAttr(c.name)}">
               <img src="${imgUrl}" alt="${escapeAttr(c.name)}" loading="lazy">
               <div class="stack-item-overlay">
-                <span class="tag-badge" data-card="${escapeAttr(c.name)}">${escapeHtml(tag)}</span>
-                <button class="card-remove-btn" data-card="${escapeAttr(c.name)}">&times;</button>
+                <button class="card-options-btn" data-card="${escapeAttr(c.name)}">&#8942;</button>
               </div>
             </div>`;
         }).join('')}
@@ -495,8 +522,8 @@ function renderStackGroup({ label, cards }) {
     </div>`;
 }
 
-function renderGridGroup({ label, cards }) {
-  const isCollapsed = collapsedGroups.has(label);
+function renderGridGroup({ label, cards }, options = {}) {
+  const isCollapsed = (options.collapsedSet || collapsedGroups).has(label);
   const arrow = isCollapsed ? '\u25B6' : '\u25BC';
   return `
     <div class="card-stack" data-group="${escapeAttr(label)}">
@@ -508,13 +535,11 @@ function renderGridGroup({ label, cards }) {
       <div class="card-grid" ${isCollapsed ? 'hidden' : ''}>
         ${cards.map(c => {
           const imgUrl = c.scryfallData?.imageUris?.normal || '';
-          const tag = c.tag || 'untagged';
           return `
             <div class="deck-grid-item" data-card="${escapeAttr(c.name)}">
               <img src="${imgUrl}" alt="${escapeAttr(c.name)}" loading="lazy">
               <div class="grid-item-overlay">
-                <span class="tag-badge" data-card="${escapeAttr(c.name)}">${escapeHtml(tag)}</span>
-                <button class="card-remove-btn" data-card="${escapeAttr(c.name)}">&times;</button>
+                <button class="card-options-btn" data-card="${escapeAttr(c.name)}">&#8942;</button>
               </div>
             </div>`;
         }).join('')}
@@ -528,25 +553,26 @@ function renderGridGroup({ label, cards }) {
 
 const TYPE_ORDER = ['Creature', 'Instant', 'Sorcery', 'Enchantment', 'Artifact', 'Planeswalker', 'Land', 'Other'];
 
+function sortCards(cards, sorting) {
+  return [...cards].sort((a, b) => {
+    if (sorting === 'az') return a.name.localeCompare(b.name);
+    return (a.scryfallData?.cmc ?? 0) - (b.scryfallData?.cmc ?? 0);
+  });
+}
+
 function groupCards(cards, grouping) {
   const groups = new Map();
 
   for (const card of cards) {
     let key;
     switch (grouping) {
-      case 'tag':
-        key = card.tag || 'Untagged';
-        break;
       case 'type':
         key = extractPrimaryType(card.scryfallData?.typeLine || '');
         break;
-      case 'cmc': {
-        const cmc = Math.floor(card.scryfallData?.cmc ?? 0);
-        key = cmc >= 7 ? '7+' : String(cmc);
-        break;
-      }
+      case 'tag':
       default:
-        key = 'All Cards';
+        key = card.tag || 'Untagged';
+        break;
     }
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(card);
@@ -555,24 +581,23 @@ function groupCards(cards, grouping) {
   // Sort groups
   let sortedKeys;
   switch (grouping) {
+    case 'type':
+      sortedKeys = TYPE_ORDER.filter(t => groups.has(t));
+      break;
     case 'tag':
+    default:
       sortedKeys = [...groups.keys()].sort((a, b) => {
         if (a === 'Untagged') return 1;
         if (b === 'Untagged') return -1;
         return a.localeCompare(b);
       });
       break;
-    case 'type':
-      sortedKeys = TYPE_ORDER.filter(t => groups.has(t));
-      break;
-    case 'cmc':
-      sortedKeys = ['0', '1', '2', '3', '4', '5', '6', '7+'].filter(k => groups.has(k));
-      break;
-    default:
-      sortedKeys = [...groups.keys()];
   }
 
-  return sortedKeys.map(key => ({ label: key, cards: groups.get(key) }));
+  return sortedKeys.map(key => ({
+    label: key,
+    cards: sortCards(groups.get(key), deckSorting),
+  }));
 }
 
 function extractPrimaryType(typeLine) {
@@ -595,8 +620,9 @@ function openTagEditor(anchorEl, cardName, state, handlers) {
   // Remove any existing tag editor
   document.querySelectorAll('.tag-editor').forEach(e => e.remove());
 
-  const existingTags = [...new Set(state.cards.map(c => c.tag).filter(Boolean))].sort();
-  const currentTag = state.cards.find(c => c.name === cardName)?.tag;
+  const allCards = [...(state.cards || []), ...(state.considering || [])];
+  const existingTags = [...new Set(allCards.map(c => c.tag).filter(Boolean))].sort();
+  const currentTag = allCards.find(c => c.name === cardName)?.tag;
 
   const editor = document.createElement('div');
   editor.className = 'tag-editor';
@@ -640,6 +666,125 @@ function openTagEditor(anchorEl, cardName, state, handlers) {
     const closeHandler = (e) => {
       if (!editor.contains(e.target)) {
         editor.remove();
+        document.removeEventListener('click', closeHandler);
+      }
+    };
+    document.addEventListener('click', closeHandler);
+  }, 0);
+}
+
+// ============================================================
+// CARD OPTIONS MENU
+// ============================================================
+
+function openCardOptionsMenu(anchorEl, cardName) {
+  // Remove any existing options menu
+  document.querySelectorAll('.card-options-menu').forEach(e => e.remove());
+
+  const menu = document.createElement('div');
+  menu.className = 'card-options-menu';
+  menu.innerHTML = `
+    <div class="card-options-item" data-action="remove">Remove from deck</div>
+    <div class="card-options-item" data-action="considering">Move to Considering</div>
+    <div class="card-options-item" data-action="tags">Manage Tags</div>
+  `;
+
+  // Position using fixed positioning relative to the button
+  const rect = anchorEl.getBoundingClientRect();
+  menu.style.position = 'fixed';
+  menu.style.top = `${rect.bottom + 4}px`;
+  menu.style.left = `${rect.left - 120}px`;
+  document.body.appendChild(menu);
+
+  // Adjust if off-screen
+  requestAnimationFrame(() => {
+    const menuRect = menu.getBoundingClientRect();
+    if (menuRect.left < 8) menu.style.left = '8px';
+    if (menuRect.bottom > window.innerHeight - 8) {
+      menu.style.top = `${rect.top - menuRect.height - 4}px`;
+    }
+  });
+
+  menu.addEventListener('click', (e) => {
+    const item = e.target.closest('.card-options-item');
+    if (!item) return;
+    const action = item.dataset.action;
+    if (action === 'remove') {
+      if (_deckHandlers.onRemoveCard) _deckHandlers.onRemoveCard(cardName);
+    } else if (action === 'considering') {
+      if (_deckHandlers.onMoveToConsidering) _deckHandlers.onMoveToConsidering(cardName);
+    } else if (action === 'tags') {
+      openTagEditor(anchorEl, cardName, _deckState, _deckHandlers);
+    }
+    menu.remove();
+  });
+
+  // Close on outside click
+  setTimeout(() => {
+    const closeHandler = (e) => {
+      if (!menu.contains(e.target) && e.target !== anchorEl) {
+        menu.remove();
+        document.removeEventListener('click', closeHandler);
+      }
+    };
+    document.addEventListener('click', closeHandler);
+  }, 0);
+}
+
+// ============================================================
+// CONSIDERING OPTIONS MENU
+// ============================================================
+
+function openConsideringOptionsMenu(anchorEl, cardName) {
+  document.querySelectorAll('.card-options-menu').forEach(e => e.remove());
+
+  const card = _consideringState?.considering.find(c => c.name === cardName);
+  if (!card) return;
+
+  const menuItems = card.inDeck
+    ? `<div class="card-options-item" data-action="cut">Cut from Deck</div>
+       <div class="card-options-item" data-action="keep">Keep in Deck</div>
+       <div class="card-options-item" data-action="tags">Manage Tags</div>`
+    : `<div class="card-options-item" data-action="add">Add to Deck</div>
+       <div class="card-options-item" data-action="dismiss">Dismiss</div>
+       <div class="card-options-item" data-action="tags">Manage Tags</div>`;
+
+  const menu = document.createElement('div');
+  menu.className = 'card-options-menu';
+  menu.innerHTML = menuItems;
+
+  const rect = anchorEl.getBoundingClientRect();
+  menu.style.position = 'fixed';
+  menu.style.top = `${rect.bottom + 4}px`;
+  menu.style.left = `${rect.left - 120}px`;
+  document.body.appendChild(menu);
+
+  requestAnimationFrame(() => {
+    const menuRect = menu.getBoundingClientRect();
+    if (menuRect.left < 8) menu.style.left = '8px';
+    if (menuRect.bottom > window.innerHeight - 8) {
+      menu.style.top = `${rect.top - menuRect.height - 4}px`;
+    }
+  });
+
+  menu.addEventListener('click', (e) => {
+    const item = e.target.closest('.card-options-item');
+    if (!item) return;
+    const action = item.dataset.action;
+    if (action === 'add') _consideringHandlers?.onAddFromConsidering?.(cardName);
+    if (action === 'dismiss') _consideringHandlers?.onDismissConsidering?.(cardName);
+    if (action === 'cut') _consideringHandlers?.onCutFromConsidering?.(cardName);
+    if (action === 'keep') _consideringHandlers?.onKeepFromConsidering?.(cardName);
+    if (action === 'tags') {
+      openTagEditor(anchorEl, cardName, _consideringState, _consideringHandlers);
+    }
+    menu.remove();
+  });
+
+  setTimeout(() => {
+    const closeHandler = (e) => {
+      if (!menu.contains(e.target) && e.target !== anchorEl) {
+        menu.remove();
         document.removeEventListener('click', closeHandler);
       }
     };
@@ -1053,12 +1198,15 @@ function updateCutsDisplay(el, state) {
 // ============================================================
 
 let _consideringHandlers = null;
+let _consideringState = null;
+const consideringCollapsedGroups = new Set();
 
 export function renderConsideringPanel(state, handlers) {
   const el = document.getElementById('considering-panel');
   if (!el) return;
 
   _consideringHandlers = handlers;
+  _consideringState = state;
 
   if (!initialized.has('considering')) {
     initialized.add('considering');
@@ -1075,15 +1223,47 @@ function buildConsideringPanel(el, state, handlers) {
     </div>
   `;
 
+  // Event delegation on cards container
   el.querySelector('#considering-cards').addEventListener('click', (e) => {
-    const btn = e.target.closest('button[data-action]');
-    if (!btn) return;
-    const cardName = btn.dataset.card;
-    const action = btn.dataset.action;
-    if (action === 'add' && _consideringHandlers.onAddFromConsidering) _consideringHandlers.onAddFromConsidering(cardName);
-    if (action === 'dismiss' && _consideringHandlers.onDismissConsidering) _consideringHandlers.onDismissConsidering(cardName);
-    if (action === 'cut' && _consideringHandlers.onCutFromConsidering) _consideringHandlers.onCutFromConsidering(cardName);
-    if (action === 'keep' && _consideringHandlers.onKeepFromConsidering) _consideringHandlers.onKeepFromConsidering(cardName);
+    // Stack header collapse/expand
+    const stackHeader = e.target.closest('.card-stack-header');
+    if (stackHeader) {
+      const group = stackHeader.dataset.group;
+      const items = stackHeader.nextElementSibling;
+      const arrow = stackHeader.querySelector('.section-arrow');
+      if (consideringCollapsedGroups.has(group)) {
+        consideringCollapsedGroups.delete(group);
+        items.hidden = false;
+        arrow.textContent = '\u25BC';
+      } else {
+        consideringCollapsedGroups.add(group);
+        items.hidden = true;
+        arrow.textContent = '\u25B6';
+      }
+      return;
+    }
+
+    // Card options menu (considering-specific)
+    const optionsBtn = e.target.closest('.card-options-btn');
+    if (optionsBtn) {
+      e.stopPropagation();
+      const cardName = optionsBtn.dataset.card;
+      if (cardName) openConsideringOptionsMenu(optionsBtn, cardName);
+      return;
+    }
+
+    // Card image click — inline expand (stacks) or full overlay (grid)
+    const cardItem = e.target.closest('.card-stack-item, .deck-grid-item');
+    if (cardItem) {
+      if (cardItem.classList.contains('card-stack-item')) {
+        const wasExpanded = cardItem.classList.contains('expanded');
+        el.querySelectorAll('.card-stack-item.expanded').forEach(c => c.classList.remove('expanded'));
+        if (!wasExpanded) cardItem.classList.add('expanded');
+      } else {
+        const img = cardItem.querySelector('img');
+        if (img && img.src) showCardOverlay(img.src, cardItem.dataset.card);
+      }
+    }
   });
 }
 
@@ -1096,32 +1276,20 @@ function updateConsideringDisplay(el, state) {
     return;
   }
 
-  cardsEl.innerHTML = state.considering.map(card => {
-    const imgUrl = card.scryfallData?.imageUris?.normal || '';
-    const isInDeck = card.inDeck;
+  const renderOpts = { collapsedSet: consideringCollapsedGroups };
+  const groups = groupCards(state.considering, deckGrouping);
 
-    const buttons = isInDeck
-      ? `<button class="btn btn-sm btn-danger" data-action="cut" data-card="${escapeAttr(card.name)}">Cut from Deck</button>
-         <button class="btn btn-sm" data-action="keep" data-card="${escapeAttr(card.name)}">Keep in Deck</button>`
-      : `<button class="btn btn-sm btn-success" data-action="add" data-card="${escapeAttr(card.name)}">Add to Deck</button>
-         <button class="btn btn-sm" data-action="dismiss" data-card="${escapeAttr(card.name)}">Dismiss</button>`;
+  if (deckViewMode === 'stacks') {
+    cardsEl.innerHTML = groups.map(g => renderStackGroup(g, renderOpts)).join('');
+  } else {
+    cardsEl.innerHTML = groups.map(g => renderGridGroup(g, renderOpts)).join('');
+  }
 
-    const sourceBadges = (card.sources || []).map(s => {
-      const labels = { scryfall: 'S', edhrec: 'E', spellbook: 'C' };
-      const classes = { scryfall: 'source-scryfall', edhrec: 'source-edhrec', spellbook: 'source-spellbook' };
-      return `<span class="source-badge ${classes[s] || ''}">${labels[s] || s}</span>`;
-    }).join('');
-
-    return `
-      <div class="rec-card" data-card="${escapeAttr(card.name)}">
-        ${imgUrl ? `<img class="card-image" src="${imgUrl}" alt="${escapeAttr(card.name)}" loading="lazy">` : ''}
-        <div class="rec-card-info">
-          <div class="flex gap-sm" style="align-items:center">${sourceBadges}</div>
-          <p class="rec-pitch">${escapeHtml(card.aiText || '')}</p>
-          <div class="action-buttons">${buttons}</div>
-        </div>
-      </div>`;
-  }).join('');
+  if (mobileDoubleColumn) {
+    cardsEl.classList.add('mobile-two-col');
+  } else {
+    cardsEl.classList.remove('mobile-two-col');
+  }
 }
 
 // ============================================================

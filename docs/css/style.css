@@ -67,6 +67,7 @@ body {
   padding: 20px 16px 12px;
   border-bottom: 1px solid var(--border-color);
   background: var(--bg-secondary);
+  position: relative;
 }
 
 .app-title {
@@ -80,6 +81,38 @@ body {
   font-size: 0.8rem;
   color: var(--text-muted);
   margin-top: 2px;
+}
+
+/* ===== Settings Gear & Dropdown ===== */
+.settings-gear-btn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.settings-gear-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.settings-dropdown {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 16px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
 }
 
 /* ===== Sections Container ===== */
@@ -694,14 +727,19 @@ select.input {
   gap: 12px;
 }
 
-.deck-commander-display {
-  text-align: center;
-  margin-bottom: 4px;
+.deck-commander-section {
+  margin-bottom: 8px;
 }
 
-.deck-commander-display img {
+.deck-commander-section img.commander-image {
   max-width: 200px;
   border-radius: 4.75% / 3.5%;
+  display: block;
+  margin: 0 auto;
+}
+
+#deck-commander-selected {
+  text-align: center;
 }
 
 .deck-toolbar {
@@ -724,7 +762,9 @@ select.input {
 }
 
 .deck-view-toggle button,
-.deck-grouping-toggle button {
+.deck-grouping-toggle button,
+.deck-sorting-toggle button,
+.deck-cols-toggle button {
   padding: 6px 10px;
   font-size: 0.7rem;
   min-height: 32px;
@@ -765,7 +805,8 @@ select.input {
   aspect-ratio: 488 / 90;
   overflow: hidden;
   cursor: pointer;
-  border-left: 3px solid transparent;
+  border: 3px solid transparent;
+  border-radius: 4.75% / 3.5%;
   transition: border-color var(--transition-fast);
 }
 
@@ -774,13 +815,24 @@ select.input {
 }
 
 .card-stack-item:hover {
-  border-left-color: var(--accent-secondary);
+  border-color: var(--accent-secondary);
 }
 
 .card-stack-item:last-child {
   aspect-ratio: auto;
   height: auto;
   overflow: visible;
+}
+
+.card-stack-item.expanded {
+  aspect-ratio: auto;
+  overflow: visible;
+  z-index: 10;
+  border: 3px solid var(--accent-secondary);
+}
+
+.card-stack-item.expanded img {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
 }
 
 .card-stack-item img {
@@ -791,28 +843,21 @@ select.input {
 
 .card-stack-item .stack-item-overlay {
   position: absolute;
-  top: 0;
-  right: 4px;
+  bottom: 4px;
+  left: 4px;
   display: flex;
   align-items: center;
   gap: 4px;
-  height: 100%;
   opacity: 0;
   transition: opacity var(--transition-fast);
   z-index: 2;
 }
 
-.card-stack-item:hover .stack-item-overlay,
-.card-stack-item:last-child .stack-item-overlay {
+.card-stack-item.expanded .stack-item-overlay {
   opacity: 1;
 }
 
-.card-stack-item:last-child .stack-item-overlay {
-  height: auto;
-  top: 4px;
-}
-
-.card-remove-btn {
+.card-options-btn {
   width: 24px;
   height: 24px;
   display: flex;
@@ -823,13 +868,36 @@ select.input {
   border: none;
   border-radius: 50%;
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 1.1rem;
   line-height: 1;
   transition: background var(--transition-fast);
 }
 
-.card-remove-btn:hover {
-  background: var(--accent-danger);
+.card-options-btn:hover {
+  background: var(--accent-primary);
+}
+
+.card-options-menu {
+  min-width: 160px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 200;
+  padding: 4px 0;
+  overflow: hidden;
+}
+
+.card-options-item {
+  padding: 8px 12px;
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.card-options-item:hover {
+  background: var(--bg-hover);
 }
 
 /* ===== Deck Grid View ===== */
@@ -1198,13 +1266,32 @@ select.input {
   outline-offset: 2px;
 }
 
+/* ===== Mobile Two-Column Stacks ===== */
+@media (max-width: 767px) {
+  #deck-cards.mobile-two-col,
+  #considering-cards.mobile-two-col {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  #deck-cards.mobile-two-col .card-stack,
+  #considering-cards.mobile-two-col .card-stack {
+    width: calc(50% - 4px);
+  }
+}
+
 /* ===== Responsive ===== */
 @media (min-width: 768px) {
+  .deck-mobile-cols-btn {
+    display: none;
+  }
   .card-grid {
     grid-template-columns: repeat(3, 1fr);
   }
 
-  #deck-cards {
+  #deck-cards,
+  #considering-cards {
     display: flex;
     flex-wrap: wrap;
     gap: 16px;

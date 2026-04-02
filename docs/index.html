@@ -10,7 +10,29 @@
   <header class="app-header">
     <h1 class="app-title">VibeTutor</h1>
     <p class="app-subtitle">AI-Powered Commander Deck Builder</p>
+    <button id="settings-toggle" class="settings-gear-btn" aria-label="Settings">&#9881;</button>
   </header>
+
+  <div id="settings-dropdown" class="settings-dropdown" hidden>
+    <div class="field-group">
+      <label class="field-label" for="settings-model">LLM Model</label>
+      <select id="settings-model" class="input">
+        <option value="anthropic/claude-sonnet-4">Claude Sonnet 4</option>
+        <option value="anthropic/claude-haiku-4">Claude Haiku 4</option>
+        <option value="google/gemini-2.5-flash">Gemini 2.5 Flash</option>
+        <option value="openai/gpt-4o-mini">GPT-4o Mini</option>
+        <option value="openai/gpt-4o">GPT-4o</option>
+      </select>
+    </div>
+    <div class="field-group">
+      <label class="field-label" for="settings-api-key">OpenRouter API Key</label>
+      <input type="password" id="settings-api-key" class="input" placeholder="sk-or-v1-...">
+      <p class="field-hint">Required for AI features. Get one at <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a></p>
+    </div>
+    <div class="iteration-counter" id="settings-iteration-counter">
+      Suggestions used: 0
+    </div>
+  </div>
 
   <main class="sections-container">
 
