@@ -4,9 +4,7 @@
  * Bracket estimation.
  */
 
-import { WORKER_URL } from './api.js';
-
-const API_BASE = `${WORKER_URL}/spellbook`;
+const API_BASE = 'https://backend.commanderspellbook.com';
 
 /**
  * Find combos in the given card list.

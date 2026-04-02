@@ -2,8 +2,6 @@
  * Cloudflare Worker — VibeTutor Middleware
  * Routes:
  *   GET  /edhrec/commanders/{slug} — proxy to json.edhrec.com, cache 24h in KV
- *   POST /llm/chat                — proxy to OpenRouter, BYOK via X-User-API-Key
- *   POST /spellbook/*             — proxy to backend.commanderspellbook.com
  *   GET  /health                  — status check
  *   OPTIONS *                     — CORS preflight
  */
@@ -20,12 +18,6 @@ export default {
     // Route handling
     if (url.pathname.startsWith('/edhrec/')) {
       return handleEdhrec(url, env);
-    }
-    if (url.pathname === '/llm/chat' && request.method === 'POST') {
-      return handleLLM(request, env);
-    }
-    if (url.pathname.startsWith('/spellbook/') && request.method === 'POST') {
-      return handleSpellbook(url, request);
     }
     if (url.pathname === '/health') {
       return jsonResponse({ status: 'ok' });
@@ -65,73 +57,6 @@ async function handleEdhrec(url, env) {
 }
 
 /**
- * Proxy LLM requests to OpenRouter.
- * v1: BYOK only — user sends their key via X-User-API-Key header.
- * Future: fall back to env.OPENROUTER_KEY for a free tier.
- */
-async function handleLLM(request, env) {
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return jsonResponse({ error: 'Invalid JSON body' }, 400);
-  }
-
-  const userKey = request.headers.get('X-User-API-Key');
-
-  // v1: BYOK only
-  if (!userKey) {
-    return jsonResponse(
-      { error: 'API key required. Add your OpenRouter key in settings.' },
-      401
-    );
-  }
-
-  try {
-    const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${userKey}`,
-      },
-      body: JSON.stringify(body),
-    });
-
-    const responseText = await resp.text();
-    return new Response(responseText, {
-      status: resp.status,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders() },
-    });
-  } catch (e) {
-    return jsonResponse({ error: 'LLM proxy error: ' + e.message }, 502);
-  }
-}
-
-/**
- * Proxy Commander Spellbook API requests.
- */
-async function handleSpellbook(url, request) {
-  const path = url.pathname.replace('/spellbook', '');
-  const upstream = `https://backend.commanderspellbook.com${path}`;
-
-  try {
-    const resp = await fetch(upstream, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: await request.text(),
-    });
-
-    const responseText = await resp.text();
-    return new Response(responseText, {
-      status: resp.status,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders() },
-    });
-  } catch (e) {
-    return jsonResponse({ error: 'Spellbook proxy error: ' + e.message }, 502);
-  }
-}
-
-/**
  * Create a JSON response with CORS headers.
  */
 function jsonResponse(data, status = 200) {
@@ -148,6 +73,6 @@ function corsHeaders() {
   return {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, X-User-API-Key',
+    'Access-Control-Allow-Headers': 'Content-Type',
   };
 }
