@@ -470,6 +470,8 @@ const handlers = {
  * Render all panels based on current state.
  */
 function render() {
+  const scrollY = window.scrollY;
+
   // Update badges
   const cardCount = state.cards.length;
   updateBadge('deck', `${cardCount}/99`);
@@ -499,6 +501,8 @@ function render() {
   ui.renderCutsPanel(state, handlers);
   ui.renderStatsPanel(state);
   ui.updateSettingsMenu(state);
+
+  window.scrollTo(0, scrollY);
 }
 
 // ============================================================

@@ -4,7 +4,7 @@
  */
 
 /** Worker base URL — update this when deployed */
-const WORKER_URL = 'https://vibetutor-worker.spades09.workers.dev';
+export const WORKER_URL = 'https://vibetutor-worker.spades09.workers.dev';
 
 /**
  * Fetch and parse EDHREC data for a commander.
