@@ -2,6 +2,7 @@
  * Cloudflare Worker — VibeTutor Middleware
  * Routes:
  *   GET  /edhrec/commanders/{slug} — proxy to json.edhrec.com, cache 24h in KV
+ *   POST /spellbook/*             — proxy to backend.commanderspellbook.com
  *   GET  /health                  — status check
  *   OPTIONS *                     — CORS preflight
  */
@@ -18,6 +19,9 @@ export default {
     // Route handling
     if (url.pathname.startsWith('/edhrec/')) {
       return handleEdhrec(url, env);
+    }
+    if (url.pathname.startsWith('/spellbook/') && request.method === 'POST') {
+      return handleSpellbook(url, request);
     }
     if (url.pathname === '/health') {
       return jsonResponse({ status: 'ok' });
@@ -54,6 +58,30 @@ async function handleEdhrec(url, env) {
   return new Response(data, {
     headers: { 'Content-Type': 'application/json', ...corsHeaders() },
   });
+}
+
+/**
+ * Proxy Commander Spellbook API requests (no CORS on their end).
+ */
+async function handleSpellbook(url, request) {
+  const path = url.pathname.replace('/spellbook', '');
+  const upstream = `https://backend.commanderspellbook.com${path}`;
+
+  try {
+    const resp = await fetch(upstream, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: await request.text(),
+    });
+
+    const responseText = await resp.text();
+    return new Response(responseText, {
+      status: resp.status,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders() },
+    });
+  } catch (e) {
+    return jsonResponse({ error: 'Spellbook proxy error: ' + e.message }, 502);
+  }
 }
 
 /**
