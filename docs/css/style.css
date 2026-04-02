@@ -823,6 +823,17 @@ select.input {
   overflow: visible;
 }
 
+.card-stack-item.expanded {
+  aspect-ratio: auto;
+  overflow: visible;
+  z-index: 10;
+  border-left: 3px solid var(--accent-secondary);
+}
+
+.card-stack-item.expanded img {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+}
+
 .card-stack-item img {
   width: 100%;
   display: block;

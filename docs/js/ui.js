@@ -417,11 +417,17 @@ function buildDeckPanel(el, state, handlers) {
       return;
     }
 
-    // Card image click — show overlay
+    // Card image click — inline expand (stacks) or full overlay (grid)
     const cardItem = e.target.closest('.card-stack-item, .deck-grid-item');
     if (cardItem) {
-      const img = cardItem.querySelector('img');
-      if (img && img.src) showCardOverlay(img.src, cardItem.dataset.card);
+      if (cardItem.classList.contains('card-stack-item')) {
+        const wasExpanded = cardItem.classList.contains('expanded');
+        el.querySelectorAll('.card-stack-item.expanded').forEach(c => c.classList.remove('expanded'));
+        if (!wasExpanded) cardItem.classList.add('expanded');
+      } else {
+        const img = cardItem.querySelector('img');
+        if (img && img.src) showCardOverlay(img.src, cardItem.dataset.card);
+      }
     }
   });
 }
@@ -1222,11 +1228,17 @@ function buildConsideringPanel(el, state, handlers) {
       return;
     }
 
-    // Card image click — show overlay
+    // Card image click — inline expand (stacks) or full overlay (grid)
     const cardItem = e.target.closest('.card-stack-item, .deck-grid-item');
     if (cardItem) {
-      const img = cardItem.querySelector('img');
-      if (img && img.src) showCardOverlay(img.src, cardItem.dataset.card);
+      if (cardItem.classList.contains('card-stack-item')) {
+        const wasExpanded = cardItem.classList.contains('expanded');
+        el.querySelectorAll('.card-stack-item.expanded').forEach(c => c.classList.remove('expanded'));
+        if (!wasExpanded) cardItem.classList.add('expanded');
+      } else {
+        const img = cardItem.querySelector('img');
+        if (img && img.src) showCardOverlay(img.src, cardItem.dataset.card);
+      }
     }
   });
 }
