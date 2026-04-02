@@ -590,8 +590,9 @@ function openTagEditor(anchorEl, cardName, state, handlers) {
   // Remove any existing tag editor
   document.querySelectorAll('.tag-editor').forEach(e => e.remove());
 
-  const existingTags = [...new Set(state.cards.map(c => c.tag).filter(Boolean))].sort();
-  const currentTag = state.cards.find(c => c.name === cardName)?.tag;
+  const allCards = [...(state.cards || []), ...(state.considering || [])];
+  const existingTags = [...new Set(allCards.map(c => c.tag).filter(Boolean))].sort();
+  const currentTag = allCards.find(c => c.name === cardName)?.tag;
 
   const editor = document.createElement('div');
   editor.className = 'tag-editor';
@@ -712,9 +713,11 @@ function openConsideringOptionsMenu(anchorEl, cardName) {
 
   const menuItems = card.inDeck
     ? `<div class="card-options-item" data-action="cut">Cut from Deck</div>
-       <div class="card-options-item" data-action="keep">Keep in Deck</div>`
+       <div class="card-options-item" data-action="keep">Keep in Deck</div>
+       <div class="card-options-item" data-action="tags">Manage Tags</div>`
     : `<div class="card-options-item" data-action="add">Add to Deck</div>
-       <div class="card-options-item" data-action="dismiss">Dismiss</div>`;
+       <div class="card-options-item" data-action="dismiss">Dismiss</div>
+       <div class="card-options-item" data-action="tags">Manage Tags</div>`;
 
   const menu = document.createElement('div');
   menu.className = 'card-options-menu';
@@ -742,6 +745,9 @@ function openConsideringOptionsMenu(anchorEl, cardName) {
     if (action === 'dismiss') _consideringHandlers?.onDismissConsidering?.(cardName);
     if (action === 'cut') _consideringHandlers?.onCutFromConsidering?.(cardName);
     if (action === 'keep') _consideringHandlers?.onKeepFromConsidering?.(cardName);
+    if (action === 'tags') {
+      openTagEditor(anchorEl, cardName, _consideringState, _consideringHandlers);
+    }
     menu.remove();
   });
 

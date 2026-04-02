@@ -183,6 +183,7 @@ const handlers = {
     if (!card) return;
     const considerCard = {
       name: card.name,
+      tag: card.tag || null,
       scryfallData: card.scryfallData,
       aiText: card.aiPitch,
       source: 'deck',
@@ -196,12 +197,20 @@ const handlers = {
     ui.showToast(`${cardName} moved to Considering`);
   },
 
-  /** Change a card's tag */
+  /** Change a card's tag (works for both deck and considering cards) */
   onTagChange(cardName, newTag) {
-    const cards = state.cards.map(c =>
-      c.name === cardName ? { ...c, tag: newTag } : c
-    );
-    updateState({ cards });
+    const updates = {};
+    if (state.cards.some(c => c.name === cardName)) {
+      updates.cards = state.cards.map(c =>
+        c.name === cardName ? { ...c, tag: newTag } : c
+      );
+    }
+    if (state.considering.some(c => c.name === cardName)) {
+      updates.considering = state.considering.map(c =>
+        c.name === cardName ? { ...c, tag: newTag } : c
+      );
+    }
+    updateState(updates);
   },
 
   /** Import cards from a parsed decklist */
@@ -320,6 +329,7 @@ const handlers = {
 
     const considerCard = {
       name: rec.name,
+      tag: rec.tag || null,
       scryfallData: rec.scryfallData,
       aiText: rec.pitch,
       source: 'recommendations',
@@ -385,6 +395,7 @@ const handlers = {
     const deckCard = state.cards.find(c => c.name === cardName);
     const considerCard = {
       name: cardName,
+      tag: deckCard?.tag || null,
       scryfallData: cut.scryfallData || deckCard?.scryfallData,
       aiText: cut.reason,
       source: 'cuts',
@@ -415,7 +426,7 @@ const handlers = {
     if (!state.cards.some(c => c.name === cardName)) {
       const deckCard = {
         name: card.name,
-        tag: null,
+        tag: card.tag || null,
         scryfallData: card.scryfallData,
         aiPitch: card.aiText,
         edhrecSynergy: null,
