@@ -24,31 +24,37 @@ export async function findCombos(cardNames) {
     const resp = await fetch(`${API_BASE}/find-my-combos`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ commanders: [], main: cardNames }),
+      body: JSON.stringify({ commanders: [], main: cardNames.map(n => ({ card: n })) }),
     });
     if (!resp.ok) return { present: [], nearMiss: [] };
 
     const data = await resp.json();
-    const results = data.results || [];
+    const results = data.results || {};
 
     const present = [];
     const nearMiss = [];
 
-    for (const combo of results) {
+    // Parse "included" combos (fully present in deck)
+    for (const combo of results.included || []) {
       const cards = combo.uses?.map(u => u.card?.name).filter(Boolean) || [];
-      const inDeck = cards.filter(c => cardNames.includes(c));
-      const missing = cards.filter(c => !cardNames.includes(c));
-
-      const entry = {
+      present.push({
         id: combo.id,
         cards,
         description: combo.produces?.map(p => p.feature?.name).filter(Boolean).join(', ') || '',
-      };
+      });
+    }
 
-      if (missing.length === 0) {
-        present.push(entry);
-      } else if (missing.length === 1) {
-        nearMiss.push({ ...entry, missingCard: missing[0] });
+    // Parse "almostIncluded" combos (1 card away)
+    for (const combo of results.almostIncluded || []) {
+      const cards = combo.uses?.map(u => u.card?.name).filter(Boolean) || [];
+      const missing = cards.filter(c => !cardNames.includes(c));
+      if (missing.length === 1) {
+        nearMiss.push({
+          id: combo.id,
+          cards,
+          description: combo.produces?.map(p => p.feature?.name).filter(Boolean).join(', ') || '',
+          missingCard: missing[0],
+        });
       }
     }
 
@@ -71,12 +77,12 @@ export async function estimateBracket(cardNames) {
     const resp = await fetch(`${API_BASE}/estimate-bracket`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ commanders: [], main: cardNames }),
+      body: JSON.stringify({ commanders: [], main: cardNames.map(n => ({ card: n })) }),
     });
     if (!resp.ok) return null;
 
     const data = await resp.json();
-    return data.bracket ?? null;
+    return data.bracketTag ?? null;
   } catch (e) {
     console.warn('Bracket estimation failed:', e.message);
     return null;
