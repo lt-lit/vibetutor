@@ -446,8 +446,13 @@ function buildDeckPanel(el, state, handlers) {
     if (cardItem) {
       if (cardItem.classList.contains('card-stack-item')) {
         const wasExpanded = cardItem.classList.contains('expanded');
-        el.querySelectorAll('.card-stack-item.expanded').forEach(c => c.classList.remove('expanded'));
-        if (!wasExpanded) cardItem.classList.add('expanded');
+        if (wasExpanded) {
+          const img = cardItem.querySelector('img');
+          if (img && img.src) showCardOverlay(img.src, cardItem.dataset.card);
+        } else {
+          el.querySelectorAll('.card-stack-item.expanded').forEach(c => c.classList.remove('expanded'));
+          cardItem.classList.add('expanded');
+        }
       } else {
         const img = cardItem.querySelector('img');
         if (img && img.src) showCardOverlay(img.src, cardItem.dataset.card);
@@ -995,6 +1000,13 @@ function buildRecommendationsPanel(el, state, handlers) {
 
   // Event delegation on results
   el.querySelector('#recs-results').addEventListener('click', (e) => {
+    // Card image click — fullscreen overlay
+    const recCard = e.target.closest('.rec-card');
+    if (recCard && e.target.tagName === 'IMG') {
+      showCardOverlay(e.target.src, recCard.dataset.card);
+      return;
+    }
+
     const btn = e.target.closest('button[data-action]');
     if (!btn) return;
     const cardName = btn.dataset.card;
@@ -1133,6 +1145,13 @@ function buildCutsPanel(el, state, handlers) {
   });
 
   el.querySelector('#cuts-results').addEventListener('click', (e) => {
+    // Card image click — fullscreen overlay
+    const recCard = e.target.closest('.rec-card');
+    if (recCard && e.target.tagName === 'IMG') {
+      showCardOverlay(e.target.src, recCard.dataset.card);
+      return;
+    }
+
     const btn = e.target.closest('button[data-action]');
     if (!btn) return;
     const cardName = btn.dataset.card;
@@ -1257,8 +1276,13 @@ function buildConsideringPanel(el, state, handlers) {
     if (cardItem) {
       if (cardItem.classList.contains('card-stack-item')) {
         const wasExpanded = cardItem.classList.contains('expanded');
-        el.querySelectorAll('.card-stack-item.expanded').forEach(c => c.classList.remove('expanded'));
-        if (!wasExpanded) cardItem.classList.add('expanded');
+        if (wasExpanded) {
+          const img = cardItem.querySelector('img');
+          if (img && img.src) showCardOverlay(img.src, cardItem.dataset.card);
+        } else {
+          el.querySelectorAll('.card-stack-item.expanded').forEach(c => c.classList.remove('expanded'));
+          cardItem.classList.add('expanded');
+        }
       } else {
         const img = cardItem.querySelector('img');
         if (img && img.src) showCardOverlay(img.src, cardItem.dataset.card);
