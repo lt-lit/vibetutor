@@ -554,10 +554,8 @@ function init() {
   // Set up card overlay dismiss
   const overlay = document.getElementById('card-overlay');
   if (overlay) {
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay || e.target.classList.contains('card-overlay-backdrop')) {
-        ui.hideCardOverlay();
-      }
+    overlay.addEventListener('click', () => {
+      ui.hideCardOverlay();
     });
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && !overlay.hidden) {
