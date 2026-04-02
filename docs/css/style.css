@@ -30,7 +30,7 @@
 
   --section-header-height: 48px;
   --touch-target: 44px;
-  --stack-clip-height: 35px;
+  --stack-clip-height: 40px;
 
   --transition-fast: 150ms ease;
   --transition-normal: 250ms ease;
@@ -782,6 +782,10 @@ select.input {
   width: 100%;
   display: block;
   border-radius: 4.75% / 3.5%;
+}
+
+.card-stack-item:not(:last-child) img {
+  border-radius: 0;
 }
 
 .card-stack-item .stack-item-overlay {
