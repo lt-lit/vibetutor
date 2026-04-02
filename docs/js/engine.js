@@ -7,7 +7,7 @@
  */
 
 import { fetchLLM } from './api.js';
-import { searchCards, lookupCard } from './scryfall.js';
+import { searchCards, lookupCard, bulkLookup } from './scryfall.js';
 import { findCombos } from './spellbook.js';
 
 // ============================================================
@@ -105,6 +105,16 @@ export async function suggestRecommendations(deckState, userPrompt) {
 
   if (validated.length === 0) {
     throw new Error('AI suggested cards not in the search pool. Try again.');
+  }
+
+  // Hydrate any cards missing Scryfall data (e.g. from EDHREC/Spellbook sources)
+  const needsHydration = validated.filter(c => !c.scryfallData);
+  if (needsHydration.length > 0) {
+    const hydrated = await bulkLookup(needsHydration.map(c => c.name));
+    const hydratedMap = new Map(hydrated.map(c => [c.name, c]));
+    for (const card of needsHydration) {
+      card.scryfallData = hydratedMap.get(card.name) || null;
+    }
   }
 
   return validated;

@@ -30,7 +30,7 @@
 
   --section-header-height: 48px;
   --touch-target: 44px;
-  --stack-clip-height: 35px;
+  --stack-clip-height: 40px;
 
   --transition-fast: 150ms ease;
   --transition-normal: 250ms ease;
@@ -348,6 +348,10 @@ select.input {
   align-items: center;
   justify-content: center;
   padding: 24px;
+}
+
+.card-overlay[hidden] {
+  display: none;
 }
 
 .card-overlay-backdrop {
@@ -758,11 +762,15 @@ select.input {
 
 .card-stack-item {
   position: relative;
-  height: var(--stack-clip-height);
+  aspect-ratio: 488 / 90;
   overflow: hidden;
   cursor: pointer;
   border-left: 3px solid transparent;
   transition: border-color var(--transition-fast);
+}
+
+.card-stack-item:not(:last-child) {
+  margin-bottom: -3.5%;
 }
 
 .card-stack-item:hover {
@@ -770,6 +778,7 @@ select.input {
 }
 
 .card-stack-item:last-child {
+  aspect-ratio: auto;
   height: auto;
   overflow: visible;
 }
@@ -787,7 +796,7 @@ select.input {
   display: flex;
   align-items: center;
   gap: 4px;
-  height: var(--stack-clip-height);
+  height: 100%;
   opacity: 0;
   transition: opacity var(--transition-fast);
   z-index: 2;
@@ -1193,6 +1202,22 @@ select.input {
 @media (min-width: 768px) {
   .card-grid {
     grid-template-columns: repeat(3, 1fr);
+  }
+
+  #deck-cards {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .card-stack {
+    width: 250px;
+  }
+
+  #recs-results {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 16px;
   }
 
   .sections-container {
