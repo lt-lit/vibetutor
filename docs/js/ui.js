@@ -173,7 +173,8 @@ export function updateSettingsMenu(state) {
 
 /** Deck panel view preferences (ephemeral, not persisted) */
 let deckViewMode = 'stacks'; // 'stacks' | 'grid'
-let deckGrouping = 'tag';    // 'tag' | 'type' | 'cmc' | 'none'
+let deckGrouping = 'tag';    // 'tag' | 'type'
+let deckSorting = 'cmc';     // 'cmc' | 'az'
 const collapsedGroups = new Set();
 
 let mobileDoubleColumn = false; // mobile 2-column stacks toggle
@@ -228,8 +229,10 @@ function buildDeckPanel(el, state, handlers) {
           <div class="segmented-control deck-grouping-toggle" id="deck-grouping-toggle">
             <button data-group="tag" class="active">Tag</button>
             <button data-group="type">Type</button>
-            <button data-group="cmc">CMC</button>
-            <button data-group="none">All</button>
+          </div>
+          <div class="segmented-control deck-sorting-toggle" id="deck-sorting-toggle">
+            <button data-sort="cmc" class="active">CMC</button>
+            <button data-sort="az">A-Z</button>
           </div>
           <button class="btn btn-sm" id="deck-import-btn">Import</button>
           <div class="relative">
@@ -330,6 +333,18 @@ function buildDeckPanel(el, state, handlers) {
     consideringCollapsedGroups.clear();
     updateDeckDisplay(el, _deckState);
     // Also update considering panel with same grouping
+    const consideringEl = document.getElementById('considering-panel');
+    if (consideringEl && _consideringState) updateConsideringDisplay(consideringEl, _consideringState);
+  });
+
+  // --- Sorting toggle ---
+  el.querySelector('#deck-sorting-toggle').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-sort]');
+    if (!btn) return;
+    deckSorting = btn.dataset.sort;
+    el.querySelectorAll('#deck-sorting-toggle button').forEach(b =>
+      b.classList.toggle('active', b.dataset.sort === deckSorting));
+    updateDeckDisplay(el, _deckState);
     const consideringEl = document.getElementById('considering-panel');
     if (consideringEl && _consideringState) updateConsideringDisplay(consideringEl, _consideringState);
   });
@@ -499,25 +514,26 @@ function renderGridGroup({ label, cards }, options = {}) {
 
 const TYPE_ORDER = ['Creature', 'Instant', 'Sorcery', 'Enchantment', 'Artifact', 'Planeswalker', 'Land', 'Other'];
 
+function sortCards(cards, sorting) {
+  return [...cards].sort((a, b) => {
+    if (sorting === 'az') return a.name.localeCompare(b.name);
+    return (a.scryfallData?.cmc ?? 0) - (b.scryfallData?.cmc ?? 0);
+  });
+}
+
 function groupCards(cards, grouping) {
   const groups = new Map();
 
   for (const card of cards) {
     let key;
     switch (grouping) {
-      case 'tag':
-        key = card.tag || 'Untagged';
-        break;
       case 'type':
         key = extractPrimaryType(card.scryfallData?.typeLine || '');
         break;
-      case 'cmc': {
-        const cmc = Math.floor(card.scryfallData?.cmc ?? 0);
-        key = cmc >= 7 ? '7+' : String(cmc);
-        break;
-      }
+      case 'tag':
       default:
-        key = 'All Cards';
+        key = card.tag || 'Untagged';
+        break;
     }
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(card);
@@ -526,26 +542,22 @@ function groupCards(cards, grouping) {
   // Sort groups
   let sortedKeys;
   switch (grouping) {
+    case 'type':
+      sortedKeys = TYPE_ORDER.filter(t => groups.has(t));
+      break;
     case 'tag':
+    default:
       sortedKeys = [...groups.keys()].sort((a, b) => {
         if (a === 'Untagged') return 1;
         if (b === 'Untagged') return -1;
         return a.localeCompare(b);
       });
       break;
-    case 'type':
-      sortedKeys = TYPE_ORDER.filter(t => groups.has(t));
-      break;
-    case 'cmc':
-      sortedKeys = ['0', '1', '2', '3', '4', '5', '6', '7+'].filter(k => groups.has(k));
-      break;
-    default:
-      sortedKeys = [...groups.keys()];
   }
 
   return sortedKeys.map(key => ({
     label: key,
-    cards: groups.get(key).sort((a, b) => (a.scryfallData?.cmc ?? 0) - (b.scryfallData?.cmc ?? 0)),
+    cards: sortCards(groups.get(key), deckSorting),
   }));
 }
 
