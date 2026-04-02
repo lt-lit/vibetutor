@@ -762,7 +762,7 @@ select.input {
 
 .card-stack-item {
   position: relative;
-  height: var(--stack-clip-height);
+  aspect-ratio: 745 / 70;
   overflow: hidden;
   cursor: pointer;
   border-left: 3px solid transparent;
@@ -774,6 +774,7 @@ select.input {
 }
 
 .card-stack-item:last-child {
+  aspect-ratio: auto;
   height: auto;
   overflow: visible;
 }
@@ -784,8 +785,8 @@ select.input {
   border-radius: 4.75% / 3.5%;
 }
 
-.card-stack-item:not(:last-child) {
-  margin-bottom: -8px;
+.card-stack-item:not(:last-child) img {
+  border-radius: 0;
 }
 
 .card-stack-item .stack-item-overlay {
@@ -795,7 +796,7 @@ select.input {
   display: flex;
   align-items: center;
   gap: 4px;
-  height: var(--stack-clip-height);
+  height: 100%;
   opacity: 0;
   transition: opacity var(--transition-fast);
   z-index: 2;
