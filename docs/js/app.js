@@ -12,6 +12,23 @@ import * as ui from './ui.js';
 /** Debounce helper for combo refresh */
 let comboRefreshTimer = null;
 
+/** Render batching — coalesce multiple updateState() calls into one render */
+let renderScheduled = false;
+let savedScrollY = null;
+
+function scheduleRender() {
+  if (!renderScheduled) {
+    savedScrollY = window.scrollY;
+    renderScheduled = true;
+    queueMicrotask(() => {
+      renderScheduled = false;
+      const scrollToRestore = savedScrollY;
+      savedScrollY = null;
+      renderActual(scrollToRestore);
+    });
+  }
+}
+
 /** Default deck state */
 function createDefaultState() {
   return {
@@ -67,7 +84,7 @@ export function updateState(updates) {
   const prevCardCount = state.cards.length;
   state = { ...state, ...updates };
   saveState(state);
-  render();
+  scheduleRender();
 
   // Refresh combos when deck changes (debounced 2s)
   if (updates.cards && updates.cards.length !== prevCardCount) {
@@ -92,7 +109,7 @@ function refreshCombos() {
       combos: { ...combos, bracket: bracketVal },
     };
     saveState(state);
-    render();
+    scheduleRender();
   }, 2000);
 }
 
@@ -107,7 +124,7 @@ function updateNestedState(key, updates) {
     [key]: { ...state[key], ...updates },
   };
   saveState(state);
-  render();
+  scheduleRender();
 }
 
 // ============================================================
@@ -132,7 +149,6 @@ const handlers = {
   onCommanderChange() {
     updateState({ commander: null });
     ui.resetPanel('deck');
-    render();
     expandSection('deck');
   },
 
@@ -469,9 +485,7 @@ const handlers = {
 /**
  * Render all panels based on current state.
  */
-function render() {
-  const scrollY = window.scrollY;
-
+function renderActual(scrollToRestore) {
   // Update badges
   const cardCount = state.cards.length;
   updateBadge('deck', `${cardCount}/99`);
@@ -502,7 +516,11 @@ function render() {
   ui.renderStatsPanel(state);
   ui.updateSettingsMenu(state);
 
-  window.scrollTo(0, scrollY);
+  // Restore scroll position, clamped to document height
+  if (scrollToRestore !== null) {
+    const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+    window.scrollTo(0, Math.min(scrollToRestore, Math.max(0, maxScroll)));
+  }
 }
 
 // ============================================================
@@ -545,7 +563,7 @@ function init() {
   ui.initSettingsMenu(handlers, state);
 
   // Initial render
-  render();
+  renderActual(null);
 }
 
 // Boot the app when DOM is ready

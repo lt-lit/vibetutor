@@ -651,7 +651,7 @@ function openTagEditor(anchorEl, cardName, state, handlers) {
 
   // Handle new tag input
   const input = editor.querySelector('input');
-  input.focus();
+  input.focus({ preventScroll: true });
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && input.value.trim()) {
       const newTag = input.value.trim().toLowerCase();
