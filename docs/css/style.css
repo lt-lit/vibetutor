@@ -762,7 +762,7 @@ select.input {
 
 .card-stack-item {
   position: relative;
-  aspect-ratio: 488 / 80;
+  aspect-ratio: 488 / 90;
   overflow: hidden;
   cursor: pointer;
   border-left: 3px solid transparent;
