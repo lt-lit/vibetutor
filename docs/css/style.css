@@ -781,6 +781,11 @@ select.input {
 .card-stack-item img {
   width: 100%;
   display: block;
+  border-radius: 4.75% / 3.5%;
+}
+
+.card-stack-item:not(:last-child) {
+  margin-bottom: -6px;
 }
 
 .card-stack-item .stack-item-overlay {
