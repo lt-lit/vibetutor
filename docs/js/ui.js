@@ -234,15 +234,15 @@ function buildDeckPanel(el, state, handlers) {
             <button data-sort="cmc" class="active">CMC</button>
             <button data-sort="az">A-Z</button>
           </div>
+          <div class="segmented-control deck-cols-toggle deck-mobile-cols-btn" id="deck-cols-toggle">
+            <button data-cols="1" class="active">1-Col</button>
+            <button data-cols="2">2-Col</button>
+          </div>
           <button class="btn btn-sm" id="deck-import-btn">Import</button>
           <div class="relative">
             <button class="btn btn-sm" id="deck-export-btn">Export</button>
           </div>
           <button class="btn btn-sm btn-primary" id="deck-autotag-btn">Auto-Tag</button>
-          <div class="segmented-control deck-cols-toggle deck-mobile-cols-btn" id="deck-cols-toggle">
-            <button data-cols="1" class="active">1-Col</button>
-            <button data-cols="2">2-Col</button>
-          </div>
         </div>
       </div>
 
