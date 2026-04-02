@@ -119,9 +119,6 @@ const handlers = {
   onCommanderSelect(card) {
     updateState({ commander: card });
 
-    // Collapse strategy, expand deck
-    collapseSection('strategy');
-
     // Fetch EDHREC data in background
     const slug = commanderToSlug(card.name);
     fetchEdhrec(slug).then(data => {
@@ -134,9 +131,9 @@ const handlers = {
   /** User wants to change commander */
   onCommanderChange() {
     updateState({ commander: null });
-    ui.resetPanel('strategy');
+    ui.resetPanel('deck');
     render();
-    expandSection('strategy');
+    expandSection('deck');
   },
 
   /** Strategy fields updated (notes, powerLevel, budgetCap) */
@@ -178,6 +175,25 @@ const handlers = {
   onRemoveCard(cardName) {
     updateState({ cards: state.cards.filter(c => c.name !== cardName) });
     ui.showToast('Card removed');
+  },
+
+  /** Move a card from deck to considering */
+  onMoveToConsidering(cardName) {
+    const card = state.cards.find(c => c.name === cardName);
+    if (!card) return;
+    const considerCard = {
+      name: card.name,
+      scryfallData: card.scryfallData,
+      aiText: card.aiPitch,
+      source: 'deck',
+      inDeck: false,
+      sources: card.sources || [],
+    };
+    updateState({
+      cards: state.cards.filter(c => c.name !== cardName),
+      considering: [...state.considering, considerCard],
+    });
+    ui.showToast(`${cardName} moved to Considering`);
   },
 
   /** Change a card's tag */
@@ -471,6 +487,7 @@ function render() {
   ui.renderRecommendationsPanel(state, handlers);
   ui.renderCutsPanel(state, handlers);
   ui.renderStatsPanel(state);
+  ui.updateSettingsMenu(state);
 }
 
 // ============================================================
@@ -508,6 +525,9 @@ function init() {
       }
     });
   }
+
+  // Initialize settings menu
+  ui.initSettingsMenu(handlers, state);
 
   // Initial render
   render();

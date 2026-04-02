@@ -42,23 +42,7 @@ export function renderStrategyPanel(state, handlers) {
 function buildStrategyPanel(el, state, handlers) {
   el.innerHTML = `
     <div class="strategy-content">
-      <!-- Commander Search -->
-      <div class="strategy-commander">
-        <label class="field-label" for="commander-search">Commander</label>
-        <div class="relative">
-          <input type="text" id="commander-search" class="input"
-                 placeholder="Search for a commander..."
-                 autocomplete="off">
-          <div id="commander-dropdown" class="dropdown" hidden></div>
-        </div>
-        <div id="commander-display" class="commander-display" hidden>
-          <img id="commander-image" class="commander-image card-image" src="" alt="">
-          <button id="commander-change" class="btn btn-sm mt-sm">Change Commander</button>
-        </div>
-      </div>
-
-      <!-- Strategy Fields (shown after commander selected) -->
-      <div id="strategy-fields" class="strategy-fields" hidden>
+      <div class="strategy-fields">
         <div class="field-group">
           <label class="field-label" for="strategy-notes">Strategy / Vibe</label>
           <textarea id="strategy-notes" class="input" rows="3"
@@ -81,91 +65,8 @@ function buildStrategyPanel(el, state, handlers) {
                  placeholder="No limit">
         </div>
       </div>
-
-      <!-- Settings -->
-      <div class="strategy-settings mt-md">
-        <div class="settings-header field-label">Settings</div>
-
-        <div class="field-group">
-          <label class="field-label" for="model-select">LLM Model</label>
-          <select id="model-select" class="input">
-            <option value="anthropic/claude-sonnet-4">Claude Sonnet 4</option>
-            <option value="anthropic/claude-haiku-4">Claude Haiku 4</option>
-            <option value="google/gemini-2.5-flash">Gemini 2.5 Flash</option>
-            <option value="openai/gpt-4o-mini">GPT-4o Mini</option>
-            <option value="openai/gpt-4o">GPT-4o</option>
-          </select>
-        </div>
-
-        <div class="field-group">
-          <label class="field-label" for="api-key-input">OpenRouter API Key</label>
-          <input type="password" id="api-key-input" class="input"
-                 placeholder="sk-or-v1-...">
-          <p class="field-hint">Required for AI features. Get one at <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a></p>
-        </div>
-
-        <div class="iteration-counter" id="iteration-counter">
-          Suggestions used: 0
-        </div>
-      </div>
     </div>
   `;
-
-  // Wire up commander search
-  const searchInput = el.querySelector('#commander-search');
-  const dropdown = el.querySelector('#commander-dropdown');
-
-  const doSearch = debounce(async (query) => {
-    if (query.length < 2) {
-      dropdown.hidden = true;
-      return;
-    }
-
-    // Search for commanders specifically
-    const results = await searchCards(`is:commander ${query}`);
-    if (results.length === 0) {
-      dropdown.hidden = true;
-      return;
-    }
-
-    dropdown.innerHTML = results.slice(0, 8).map((card, i) => `
-      <div class="dropdown-item" data-index="${i}">
-        ${card.imageUris.small ? `<img src="${card.imageUris.small}" alt="${card.name}" loading="lazy">` : ''}
-        <span>${card.name}</span>
-      </div>
-    `).join('');
-    dropdown.hidden = false;
-
-    // Store results for selection
-    dropdown._results = results.slice(0, 8);
-  }, 300);
-
-  searchInput.addEventListener('input', (e) => {
-    doSearch(e.target.value.trim());
-  });
-
-  // Close dropdown on blur (with delay for click)
-  searchInput.addEventListener('blur', () => {
-    setTimeout(() => { dropdown.hidden = true; }, 200);
-  });
-
-  // Handle commander selection
-  dropdown.addEventListener('click', (e) => {
-    const item = e.target.closest('.dropdown-item');
-    if (!item || !dropdown._results) return;
-    const index = parseInt(item.dataset.index, 10);
-    const card = dropdown._results[index];
-    if (card && handlers.onCommanderSelect) {
-      handlers.onCommanderSelect(card);
-    }
-    dropdown.hidden = true;
-    searchInput.value = '';
-  });
-
-  // Change commander button
-  el.querySelector('#commander-change').addEventListener('click', () => {
-    if (handlers.onCommanderChange) handlers.onCommanderChange();
-  });
 
   // Strategy notes
   el.querySelector('#strategy-notes').addEventListener('input', debounce((e) => {
@@ -191,41 +92,9 @@ function buildStrategyPanel(el, state, handlers) {
     }
   }, 500));
 
-  // Model selector
-  el.querySelector('#model-select').addEventListener('change', (e) => {
-    if (handlers.onSettingsUpdate) {
-      handlers.onSettingsUpdate({ model: e.target.value });
-    }
-  });
-
-  // API key
-  el.querySelector('#api-key-input').addEventListener('input', debounce((e) => {
-    if (handlers.onApiKeyChange) {
-      handlers.onApiKeyChange(e.target.value.trim());
-    }
-  }, 300));
 }
 
 function updateStrategyDisplay(el, state) {
-  const searchInput = el.querySelector('#commander-search');
-  const commanderDisplay = el.querySelector('#commander-display');
-  const commanderImage = el.querySelector('#commander-image');
-  const strategyFields = el.querySelector('#strategy-fields');
-
-  if (state.commander) {
-    // Show commander image, hide search
-    searchInput.parentElement.hidden = true;
-    commanderDisplay.hidden = false;
-    commanderImage.src = state.commander.imageUris?.normal || '';
-    commanderImage.alt = state.commander.name;
-    strategyFields.hidden = false;
-  } else {
-    // Show search, hide commander
-    searchInput.parentElement.hidden = false;
-    commanderDisplay.hidden = true;
-    strategyFields.hidden = true;
-  }
-
   // Update strategy fields (only if not focused to avoid clobbering user input)
   const notesEl = el.querySelector('#strategy-notes');
   if (notesEl && document.activeElement !== notesEl) {
@@ -244,18 +113,57 @@ function updateStrategyDisplay(el, state) {
     budgetEl.value = state.strategy.budgetCap ?? '';
   }
 
-  // Update model selector
-  const modelEl = el.querySelector('#model-select');
+}
+
+// ============================================================
+// SETTINGS MENU (gear icon dropdown)
+// ============================================================
+
+export function initSettingsMenu(handlers, state) {
+  const toggle = document.getElementById('settings-toggle');
+  const dropdown = document.getElementById('settings-dropdown');
+  if (!toggle || !dropdown) return;
+
+  toggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    dropdown.hidden = !dropdown.hidden;
+  });
+
+  // Close on outside click
+  document.addEventListener('click', (e) => {
+    if (!dropdown.contains(e.target) && e.target !== toggle) {
+      dropdown.hidden = true;
+    }
+  });
+
+  // Model selector
+  dropdown.querySelector('#settings-model').addEventListener('change', (e) => {
+    if (handlers.onSettingsUpdate) {
+      handlers.onSettingsUpdate({ model: e.target.value });
+    }
+  });
+
+  // API key
+  dropdown.querySelector('#settings-api-key').addEventListener('input', debounce((e) => {
+    if (handlers.onApiKeyChange) {
+      handlers.onApiKeyChange(e.target.value.trim());
+    }
+  }, 300));
+
+  // Initial sync
+  updateSettingsMenu(state);
+}
+
+export function updateSettingsMenu(state) {
+  const modelEl = document.getElementById('settings-model');
   if (modelEl) modelEl.value = state.settings.model;
 
-  // Update API key (only if not focused)
-  const keyEl = el.querySelector('#api-key-input');
+  const keyEl = document.getElementById('settings-api-key');
   if (keyEl && document.activeElement !== keyEl) {
     keyEl.value = localStorage.getItem('vibetutor_api_key') || '';
   }
 
-  // Update iteration counter
-  const counterEl = el.querySelector('#iteration-counter');
+  const counterEl = document.getElementById('settings-iteration-counter');
   if (counterEl) counterEl.textContent = `Suggestions used: ${state.iterationCount}`;
 }
 
@@ -267,6 +175,8 @@ function updateStrategyDisplay(el, state) {
 let deckViewMode = 'stacks'; // 'stacks' | 'grid'
 let deckGrouping = 'tag';    // 'tag' | 'type' | 'cmc' | 'none'
 const collapsedGroups = new Set();
+
+let mobileDoubleColumn = false; // mobile 2-column stacks toggle
 
 /** Stored handlers reference for event delegation */
 let _deckHandlers = null;
@@ -291,7 +201,19 @@ export function renderDeckPanel(state, handlers) {
 function buildDeckPanel(el, state, handlers) {
   el.innerHTML = `
     <div class="deck-content">
-      <div id="deck-commander" class="deck-commander-display"></div>
+      <!-- Commander Search -->
+      <div id="deck-commander" class="deck-commander-section">
+        <div id="deck-commander-search" class="relative">
+          <label class="field-label" for="deck-commander-input">Commander</label>
+          <input type="text" id="deck-commander-input" class="input"
+                 placeholder="Search for a commander..." autocomplete="off">
+          <div id="deck-commander-dropdown" class="dropdown" hidden></div>
+        </div>
+        <div id="deck-commander-selected" hidden>
+          <img id="deck-commander-image" class="commander-image card-image" src="" alt="">
+          <button id="deck-commander-change" class="btn btn-sm mt-sm">Change Commander</button>
+        </div>
+      </div>
 
       <div class="deck-toolbar">
         <div class="deck-search-wrapper relative">
@@ -314,12 +236,48 @@ function buildDeckPanel(el, state, handlers) {
             <button class="btn btn-sm" id="deck-export-btn">Export</button>
           </div>
           <button class="btn btn-sm btn-primary" id="deck-autotag-btn">Auto-Tag</button>
+          <button class="btn btn-sm deck-mobile-cols-btn" id="deck-mobile-cols-btn" title="Toggle 2-column stacks">2-Col</button>
         </div>
       </div>
 
       <div id="deck-cards"></div>
     </div>
   `;
+
+  // --- Commander search autocomplete ---
+  const cmdSearchInput = el.querySelector('#deck-commander-input');
+  const cmdDropdown = el.querySelector('#deck-commander-dropdown');
+
+  const doCmdSearch = debounce(async (query) => {
+    if (query.length < 2) { cmdDropdown.hidden = true; return; }
+    const results = await searchCards(`is:commander ${query}`);
+    if (results.length === 0) { cmdDropdown.hidden = true; return; }
+    cmdDropdown.innerHTML = results.slice(0, 8).map((card, i) => `
+      <div class="dropdown-item" data-index="${i}">
+        ${card.imageUris.small ? `<img src="${card.imageUris.small}" alt="${card.name}" loading="lazy">` : ''}
+        <span>${card.name}</span>
+      </div>
+    `).join('');
+    cmdDropdown.hidden = false;
+    cmdDropdown._results = results.slice(0, 8);
+  }, 300);
+
+  cmdSearchInput.addEventListener('input', (e) => doCmdSearch(e.target.value.trim()));
+  cmdSearchInput.addEventListener('blur', () => setTimeout(() => { cmdDropdown.hidden = true; }, 200));
+
+  cmdDropdown.addEventListener('click', (e) => {
+    const item = e.target.closest('.dropdown-item');
+    if (!item || !cmdDropdown._results) return;
+    const index = parseInt(item.dataset.index, 10);
+    const card = cmdDropdown._results[index];
+    if (card && handlers.onCommanderSelect) handlers.onCommanderSelect(card);
+    cmdDropdown.hidden = true;
+    cmdSearchInput.value = '';
+  });
+
+  el.querySelector('#deck-commander-change').addEventListener('click', () => {
+    if (handlers.onCommanderChange) handlers.onCommanderChange();
+  });
 
   // --- Card search autocomplete ---
   const searchInput = el.querySelector('#deck-search');
@@ -391,6 +349,14 @@ function buildDeckPanel(el, state, handlers) {
     }
   });
 
+  // --- Mobile 2-column toggle ---
+  el.querySelector('#deck-mobile-cols-btn').addEventListener('click', () => {
+    mobileDoubleColumn = !mobileDoubleColumn;
+    const cardsEl = el.querySelector('#deck-cards');
+    cardsEl.classList.toggle('mobile-two-col', mobileDoubleColumn);
+    el.querySelector('#deck-mobile-cols-btn').classList.toggle('active', mobileDoubleColumn);
+  });
+
   // --- Event delegation on cards container ---
   el.querySelector('#deck-cards').addEventListener('click', (e) => {
     // Stack header collapse/expand
@@ -411,20 +377,12 @@ function buildDeckPanel(el, state, handlers) {
       return;
     }
 
-    // Remove card
-    const removeBtn = e.target.closest('.card-remove-btn');
-    if (removeBtn) {
+    // Card options menu
+    const optionsBtn = e.target.closest('.card-options-btn');
+    if (optionsBtn) {
       e.stopPropagation();
-      const cardName = removeBtn.dataset.card;
-      if (cardName && _deckHandlers.onRemoveCard) _deckHandlers.onRemoveCard(cardName);
-      return;
-    }
-
-    // Tag badge click — open tag editor
-    const tagBadge = e.target.closest('.tag-badge[data-card]');
-    if (tagBadge) {
-      e.stopPropagation();
-      openTagEditor(tagBadge, tagBadge.dataset.card, _deckState, _deckHandlers);
+      const cardName = optionsBtn.dataset.card;
+      if (cardName) openCardOptionsMenu(optionsBtn, cardName);
       return;
     }
 
@@ -438,15 +396,20 @@ function buildDeckPanel(el, state, handlers) {
 }
 
 function updateDeckDisplay(el, state) {
-  // Update commander display
-  const cmdEl = el.querySelector('#deck-commander');
-  if (cmdEl) {
+  // Update commander search/display toggle
+  const cmdSearch = el.querySelector('#deck-commander-search');
+  const cmdSelected = el.querySelector('#deck-commander-selected');
+  const cmdImage = el.querySelector('#deck-commander-image');
+
+  if (cmdSearch && cmdSelected) {
     if (state.commander) {
-      cmdEl.innerHTML = `<img src="${state.commander.imageUris?.normal || ''}" alt="${escapeAttr(state.commander.name)}" loading="lazy">`;
-      cmdEl.hidden = false;
+      cmdSearch.hidden = true;
+      cmdSelected.hidden = false;
+      cmdImage.src = state.commander.imageUris?.normal || '';
+      cmdImage.alt = state.commander.name;
     } else {
-      cmdEl.innerHTML = '';
-      cmdEl.hidden = true;
+      cmdSearch.hidden = false;
+      cmdSelected.hidden = true;
     }
   }
 
@@ -466,6 +429,11 @@ function updateDeckDisplay(el, state) {
   } else {
     cardsEl.innerHTML = groups.map(g => renderGridGroup(g)).join('');
   }
+
+  // Re-apply mobile 2-column class if active
+  if (mobileDoubleColumn) {
+    cardsEl.classList.add('mobile-two-col');
+  }
 }
 
 function renderStackGroup({ label, cards }) {
@@ -481,13 +449,11 @@ function renderStackGroup({ label, cards }) {
       <div class="card-stack-items" ${isCollapsed ? 'hidden' : ''}>
         ${cards.map(c => {
           const imgUrl = c.scryfallData?.imageUris?.normal || '';
-          const tag = c.tag || 'untagged';
           return `
             <div class="card-stack-item" data-card="${escapeAttr(c.name)}">
               <img src="${imgUrl}" alt="${escapeAttr(c.name)}" loading="lazy">
               <div class="stack-item-overlay">
-                <span class="tag-badge" data-card="${escapeAttr(c.name)}">${escapeHtml(tag)}</span>
-                <button class="card-remove-btn" data-card="${escapeAttr(c.name)}">&times;</button>
+                <button class="card-options-btn" data-card="${escapeAttr(c.name)}">&#8942;</button>
               </div>
             </div>`;
         }).join('')}
@@ -508,13 +474,11 @@ function renderGridGroup({ label, cards }) {
       <div class="card-grid" ${isCollapsed ? 'hidden' : ''}>
         ${cards.map(c => {
           const imgUrl = c.scryfallData?.imageUris?.normal || '';
-          const tag = c.tag || 'untagged';
           return `
             <div class="deck-grid-item" data-card="${escapeAttr(c.name)}">
               <img src="${imgUrl}" alt="${escapeAttr(c.name)}" loading="lazy">
               <div class="grid-item-overlay">
-                <span class="tag-badge" data-card="${escapeAttr(c.name)}">${escapeHtml(tag)}</span>
-                <button class="card-remove-btn" data-card="${escapeAttr(c.name)}">&times;</button>
+                <button class="card-options-btn" data-card="${escapeAttr(c.name)}">&#8942;</button>
               </div>
             </div>`;
         }).join('')}
@@ -572,7 +536,10 @@ function groupCards(cards, grouping) {
       sortedKeys = [...groups.keys()];
   }
 
-  return sortedKeys.map(key => ({ label: key, cards: groups.get(key) }));
+  return sortedKeys.map(key => ({
+    label: key,
+    cards: groups.get(key).sort((a, b) => (a.scryfallData?.cmc ?? 0) - (b.scryfallData?.cmc ?? 0)),
+  }));
 }
 
 function extractPrimaryType(typeLine) {
@@ -640,6 +607,64 @@ function openTagEditor(anchorEl, cardName, state, handlers) {
     const closeHandler = (e) => {
       if (!editor.contains(e.target)) {
         editor.remove();
+        document.removeEventListener('click', closeHandler);
+      }
+    };
+    document.addEventListener('click', closeHandler);
+  }, 0);
+}
+
+// ============================================================
+// CARD OPTIONS MENU
+// ============================================================
+
+function openCardOptionsMenu(anchorEl, cardName) {
+  // Remove any existing options menu
+  document.querySelectorAll('.card-options-menu').forEach(e => e.remove());
+
+  const menu = document.createElement('div');
+  menu.className = 'card-options-menu';
+  menu.innerHTML = `
+    <div class="card-options-item" data-action="remove">Remove from deck</div>
+    <div class="card-options-item" data-action="considering">Move to Considering</div>
+    <div class="card-options-item" data-action="tags">Manage Tags</div>
+  `;
+
+  // Position using fixed positioning relative to the button
+  const rect = anchorEl.getBoundingClientRect();
+  menu.style.position = 'fixed';
+  menu.style.top = `${rect.bottom + 4}px`;
+  menu.style.left = `${rect.left - 120}px`;
+  document.body.appendChild(menu);
+
+  // Adjust if off-screen
+  requestAnimationFrame(() => {
+    const menuRect = menu.getBoundingClientRect();
+    if (menuRect.left < 8) menu.style.left = '8px';
+    if (menuRect.bottom > window.innerHeight - 8) {
+      menu.style.top = `${rect.top - menuRect.height - 4}px`;
+    }
+  });
+
+  menu.addEventListener('click', (e) => {
+    const item = e.target.closest('.card-options-item');
+    if (!item) return;
+    const action = item.dataset.action;
+    if (action === 'remove') {
+      if (_deckHandlers.onRemoveCard) _deckHandlers.onRemoveCard(cardName);
+    } else if (action === 'considering') {
+      if (_deckHandlers.onMoveToConsidering) _deckHandlers.onMoveToConsidering(cardName);
+    } else if (action === 'tags') {
+      openTagEditor(anchorEl, cardName, _deckState, _deckHandlers);
+    }
+    menu.remove();
+  });
+
+  // Close on outside click
+  setTimeout(() => {
+    const closeHandler = (e) => {
+      if (!menu.contains(e.target) && e.target !== anchorEl) {
+        menu.remove();
         document.removeEventListener('click', closeHandler);
       }
     };
