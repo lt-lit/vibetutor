@@ -806,6 +806,7 @@ select.input {
   overflow: hidden;
   cursor: pointer;
   border: 3px solid transparent;
+  border-radius: 4.75% / 3.5%;
   transition: border-color var(--transition-fast);
 }
 
@@ -843,7 +844,7 @@ select.input {
 .card-stack-item .stack-item-overlay {
   position: absolute;
   bottom: 4px;
-  right: 4px;
+  left: 4px;
   display: flex;
   align-items: center;
   gap: 4px;
