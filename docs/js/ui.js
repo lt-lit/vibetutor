@@ -314,6 +314,9 @@ function buildDeckPanel(el, state, handlers) {
     el.querySelectorAll('#deck-view-toggle button').forEach(b =>
       b.classList.toggle('active', b.dataset.view === deckViewMode));
     updateDeckDisplay(el, _deckState);
+    // Also update considering panel with same view mode
+    const consideringEl = document.getElementById('considering-panel');
+    if (consideringEl && _consideringState) updateConsideringDisplay(consideringEl, _consideringState);
   });
 
   // --- Grouping toggle ---
@@ -324,7 +327,11 @@ function buildDeckPanel(el, state, handlers) {
     el.querySelectorAll('#deck-grouping-toggle button').forEach(b =>
       b.classList.toggle('active', b.dataset.group === deckGrouping));
     collapsedGroups.clear();
+    consideringCollapsedGroups.clear();
     updateDeckDisplay(el, _deckState);
+    // Also update considering panel with same grouping
+    const consideringEl = document.getElementById('considering-panel');
+    if (consideringEl && _consideringState) updateConsideringDisplay(consideringEl, _consideringState);
   });
 
   // --- Import ---
@@ -436,8 +443,8 @@ function updateDeckDisplay(el, state) {
   }
 }
 
-function renderStackGroup({ label, cards }) {
-  const isCollapsed = collapsedGroups.has(label);
+function renderStackGroup({ label, cards }, options = {}) {
+  const isCollapsed = (options.collapsedSet || collapsedGroups).has(label);
   const arrow = isCollapsed ? '\u25B6' : '\u25BC';
   return `
     <div class="card-stack" data-group="${escapeAttr(label)}">
@@ -461,8 +468,8 @@ function renderStackGroup({ label, cards }) {
     </div>`;
 }
 
-function renderGridGroup({ label, cards }) {
-  const isCollapsed = collapsedGroups.has(label);
+function renderGridGroup({ label, cards }, options = {}) {
+  const isCollapsed = (options.collapsedSet || collapsedGroups).has(label);
   const arrow = isCollapsed ? '\u25B6' : '\u25BC';
   return `
     <div class="card-stack" data-group="${escapeAttr(label)}">
@@ -661,6 +668,62 @@ function openCardOptionsMenu(anchorEl, cardName) {
   });
 
   // Close on outside click
+  setTimeout(() => {
+    const closeHandler = (e) => {
+      if (!menu.contains(e.target) && e.target !== anchorEl) {
+        menu.remove();
+        document.removeEventListener('click', closeHandler);
+      }
+    };
+    document.addEventListener('click', closeHandler);
+  }, 0);
+}
+
+// ============================================================
+// CONSIDERING OPTIONS MENU
+// ============================================================
+
+function openConsideringOptionsMenu(anchorEl, cardName) {
+  document.querySelectorAll('.card-options-menu').forEach(e => e.remove());
+
+  const card = _consideringState?.considering.find(c => c.name === cardName);
+  if (!card) return;
+
+  const menuItems = card.inDeck
+    ? `<div class="card-options-item" data-action="cut">Cut from Deck</div>
+       <div class="card-options-item" data-action="keep">Keep in Deck</div>`
+    : `<div class="card-options-item" data-action="add">Add to Deck</div>
+       <div class="card-options-item" data-action="dismiss">Dismiss</div>`;
+
+  const menu = document.createElement('div');
+  menu.className = 'card-options-menu';
+  menu.innerHTML = menuItems;
+
+  const rect = anchorEl.getBoundingClientRect();
+  menu.style.position = 'fixed';
+  menu.style.top = `${rect.bottom + 4}px`;
+  menu.style.left = `${rect.left - 120}px`;
+  document.body.appendChild(menu);
+
+  requestAnimationFrame(() => {
+    const menuRect = menu.getBoundingClientRect();
+    if (menuRect.left < 8) menu.style.left = '8px';
+    if (menuRect.bottom > window.innerHeight - 8) {
+      menu.style.top = `${rect.top - menuRect.height - 4}px`;
+    }
+  });
+
+  menu.addEventListener('click', (e) => {
+    const item = e.target.closest('.card-options-item');
+    if (!item) return;
+    const action = item.dataset.action;
+    if (action === 'add') _consideringHandlers?.onAddFromConsidering?.(cardName);
+    if (action === 'dismiss') _consideringHandlers?.onDismissConsidering?.(cardName);
+    if (action === 'cut') _consideringHandlers?.onCutFromConsidering?.(cardName);
+    if (action === 'keep') _consideringHandlers?.onKeepFromConsidering?.(cardName);
+    menu.remove();
+  });
+
   setTimeout(() => {
     const closeHandler = (e) => {
       if (!menu.contains(e.target) && e.target !== anchorEl) {
@@ -1078,12 +1141,15 @@ function updateCutsDisplay(el, state) {
 // ============================================================
 
 let _consideringHandlers = null;
+let _consideringState = null;
+const consideringCollapsedGroups = new Set();
 
 export function renderConsideringPanel(state, handlers) {
   const el = document.getElementById('considering-panel');
   if (!el) return;
 
   _consideringHandlers = handlers;
+  _consideringState = state;
 
   if (!initialized.has('considering')) {
     initialized.add('considering');
@@ -1100,15 +1166,41 @@ function buildConsideringPanel(el, state, handlers) {
     </div>
   `;
 
+  // Event delegation on cards container
   el.querySelector('#considering-cards').addEventListener('click', (e) => {
-    const btn = e.target.closest('button[data-action]');
-    if (!btn) return;
-    const cardName = btn.dataset.card;
-    const action = btn.dataset.action;
-    if (action === 'add' && _consideringHandlers.onAddFromConsidering) _consideringHandlers.onAddFromConsidering(cardName);
-    if (action === 'dismiss' && _consideringHandlers.onDismissConsidering) _consideringHandlers.onDismissConsidering(cardName);
-    if (action === 'cut' && _consideringHandlers.onCutFromConsidering) _consideringHandlers.onCutFromConsidering(cardName);
-    if (action === 'keep' && _consideringHandlers.onKeepFromConsidering) _consideringHandlers.onKeepFromConsidering(cardName);
+    // Stack header collapse/expand
+    const stackHeader = e.target.closest('.card-stack-header');
+    if (stackHeader) {
+      const group = stackHeader.dataset.group;
+      const items = stackHeader.nextElementSibling;
+      const arrow = stackHeader.querySelector('.section-arrow');
+      if (consideringCollapsedGroups.has(group)) {
+        consideringCollapsedGroups.delete(group);
+        items.hidden = false;
+        arrow.textContent = '\u25BC';
+      } else {
+        consideringCollapsedGroups.add(group);
+        items.hidden = true;
+        arrow.textContent = '\u25B6';
+      }
+      return;
+    }
+
+    // Card options menu (considering-specific)
+    const optionsBtn = e.target.closest('.card-options-btn');
+    if (optionsBtn) {
+      e.stopPropagation();
+      const cardName = optionsBtn.dataset.card;
+      if (cardName) openConsideringOptionsMenu(optionsBtn, cardName);
+      return;
+    }
+
+    // Card image click — show overlay
+    const cardItem = e.target.closest('.card-stack-item, .deck-grid-item');
+    if (cardItem) {
+      const img = cardItem.querySelector('img');
+      if (img && img.src) showCardOverlay(img.src, cardItem.dataset.card);
+    }
   });
 }
 
@@ -1121,32 +1213,20 @@ function updateConsideringDisplay(el, state) {
     return;
   }
 
-  cardsEl.innerHTML = state.considering.map(card => {
-    const imgUrl = card.scryfallData?.imageUris?.normal || '';
-    const isInDeck = card.inDeck;
+  const renderOpts = { collapsedSet: consideringCollapsedGroups };
+  const groups = groupCards(state.considering, deckGrouping);
 
-    const buttons = isInDeck
-      ? `<button class="btn btn-sm btn-danger" data-action="cut" data-card="${escapeAttr(card.name)}">Cut from Deck</button>
-         <button class="btn btn-sm" data-action="keep" data-card="${escapeAttr(card.name)}">Keep in Deck</button>`
-      : `<button class="btn btn-sm btn-success" data-action="add" data-card="${escapeAttr(card.name)}">Add to Deck</button>
-         <button class="btn btn-sm" data-action="dismiss" data-card="${escapeAttr(card.name)}">Dismiss</button>`;
+  if (deckViewMode === 'stacks') {
+    cardsEl.innerHTML = groups.map(g => renderStackGroup(g, renderOpts)).join('');
+  } else {
+    cardsEl.innerHTML = groups.map(g => renderGridGroup(g, renderOpts)).join('');
+  }
 
-    const sourceBadges = (card.sources || []).map(s => {
-      const labels = { scryfall: 'S', edhrec: 'E', spellbook: 'C' };
-      const classes = { scryfall: 'source-scryfall', edhrec: 'source-edhrec', spellbook: 'source-spellbook' };
-      return `<span class="source-badge ${classes[s] || ''}">${labels[s] || s}</span>`;
-    }).join('');
-
-    return `
-      <div class="rec-card" data-card="${escapeAttr(card.name)}">
-        ${imgUrl ? `<img class="card-image" src="${imgUrl}" alt="${escapeAttr(card.name)}" loading="lazy">` : ''}
-        <div class="rec-card-info">
-          <div class="flex gap-sm" style="align-items:center">${sourceBadges}</div>
-          <p class="rec-pitch">${escapeHtml(card.aiText || '')}</p>
-          <div class="action-buttons">${buttons}</div>
-        </div>
-      </div>`;
-  }).join('');
+  if (mobileDoubleColumn) {
+    cardsEl.classList.add('mobile-two-col');
+  } else {
+    cardsEl.classList.remove('mobile-two-col');
+  }
 }
 
 // ============================================================

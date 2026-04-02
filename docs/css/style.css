@@ -1261,13 +1261,15 @@ select.input {
 
 /* ===== Mobile Two-Column Stacks ===== */
 @media (max-width: 767px) {
-  #deck-cards.mobile-two-col {
+  #deck-cards.mobile-two-col,
+  #considering-cards.mobile-two-col {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
   }
 
-  #deck-cards.mobile-two-col .card-stack {
+  #deck-cards.mobile-two-col .card-stack,
+  #considering-cards.mobile-two-col .card-stack {
     width: calc(50% - 4px);
   }
 }
@@ -1281,7 +1283,8 @@ select.input {
     grid-template-columns: repeat(3, 1fr);
   }
 
-  #deck-cards {
+  #deck-cards,
+  #considering-cards {
     display: flex;
     flex-wrap: wrap;
     gap: 16px;
