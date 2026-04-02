@@ -171,13 +171,33 @@ export function updateSettingsMenu(state) {
 // DECK PANEL
 // ============================================================
 
-/** Deck panel view preferences (ephemeral, not persisted) */
-let deckViewMode = 'stacks'; // 'stacks' | 'grid'
-let deckGrouping = 'tag';    // 'tag' | 'type'
-let deckSorting = 'cmc';     // 'cmc' | 'az'
+/** Deck panel view preferences (persisted to localStorage) */
+const VIEW_PREFS_KEY = 'vibetutor_view_prefs';
+
+function loadViewPrefs() {
+  try {
+    const saved = localStorage.getItem(VIEW_PREFS_KEY);
+    if (saved) return JSON.parse(saved);
+  } catch {}
+  return null;
+}
+
+function saveViewPrefs() {
+  localStorage.setItem(VIEW_PREFS_KEY, JSON.stringify({
+    viewMode: deckViewMode,
+    grouping: deckGrouping,
+    sorting: deckSorting,
+    twoCols: mobileDoubleColumn,
+  }));
+}
+
+const prefs = loadViewPrefs();
+let deckViewMode = prefs?.viewMode || 'stacks';
+let deckGrouping = prefs?.grouping || 'tag';
+let deckSorting = prefs?.sorting || 'cmc';
 const collapsedGroups = new Set();
 
-let mobileDoubleColumn = false; // mobile 2-column stacks toggle
+let mobileDoubleColumn = prefs?.twoCols ?? true;
 
 /** Stored handlers reference for event delegation */
 let _deckHandlers = null;
@@ -223,20 +243,20 @@ function buildDeckPanel(el, state, handlers) {
         </div>
         <div class="deck-toolbar-actions">
           <div class="segmented-control deck-view-toggle" id="deck-view-toggle">
-            <button data-view="stacks" class="active">Stacks</button>
-            <button data-view="grid">Grid</button>
+            <button data-view="stacks" class="${deckViewMode === 'stacks' ? 'active' : ''}">Stacks</button>
+            <button data-view="grid" class="${deckViewMode === 'grid' ? 'active' : ''}">Grid</button>
           </div>
           <div class="segmented-control deck-grouping-toggle" id="deck-grouping-toggle">
-            <button data-group="tag" class="active">Tag</button>
-            <button data-group="type">Type</button>
+            <button data-group="tag" class="${deckGrouping === 'tag' ? 'active' : ''}">Tag</button>
+            <button data-group="type" class="${deckGrouping === 'type' ? 'active' : ''}">Type</button>
           </div>
           <div class="segmented-control deck-sorting-toggle" id="deck-sorting-toggle">
-            <button data-sort="cmc" class="active">CMC</button>
-            <button data-sort="az">A-Z</button>
+            <button data-sort="cmc" class="${deckSorting === 'cmc' ? 'active' : ''}">CMC</button>
+            <button data-sort="az" class="${deckSorting === 'az' ? 'active' : ''}">A-Z</button>
           </div>
           <div class="segmented-control deck-cols-toggle deck-mobile-cols-btn" id="deck-cols-toggle">
-            <button data-cols="1" class="active">1-Col</button>
-            <button data-cols="2">2-Col</button>
+            <button data-cols="1" class="${!mobileDoubleColumn ? 'active' : ''}">1-Col</button>
+            <button data-cols="2" class="${mobileDoubleColumn ? 'active' : ''}">2-Col</button>
           </div>
           <button class="btn btn-sm" id="deck-import-btn">Import</button>
           <div class="relative">
@@ -317,6 +337,7 @@ function buildDeckPanel(el, state, handlers) {
     const btn = e.target.closest('button[data-view]');
     if (!btn) return;
     deckViewMode = btn.dataset.view;
+    saveViewPrefs();
     el.querySelectorAll('#deck-view-toggle button').forEach(b =>
       b.classList.toggle('active', b.dataset.view === deckViewMode));
     updateDeckDisplay(el, _deckState);
@@ -330,6 +351,7 @@ function buildDeckPanel(el, state, handlers) {
     const btn = e.target.closest('button[data-group]');
     if (!btn) return;
     deckGrouping = btn.dataset.group;
+    saveViewPrefs();
     el.querySelectorAll('#deck-grouping-toggle button').forEach(b =>
       b.classList.toggle('active', b.dataset.group === deckGrouping));
     collapsedGroups.clear();
@@ -345,6 +367,7 @@ function buildDeckPanel(el, state, handlers) {
     const btn = e.target.closest('button[data-sort]');
     if (!btn) return;
     deckSorting = btn.dataset.sort;
+    saveViewPrefs();
     el.querySelectorAll('#deck-sorting-toggle button').forEach(b =>
       b.classList.toggle('active', b.dataset.sort === deckSorting));
     updateDeckDisplay(el, _deckState);
@@ -379,6 +402,7 @@ function buildDeckPanel(el, state, handlers) {
     const btn = e.target.closest('button[data-cols]');
     if (!btn) return;
     mobileDoubleColumn = btn.dataset.cols === '2';
+    saveViewPrefs();
     el.querySelectorAll('#deck-cols-toggle button').forEach(b =>
       b.classList.toggle('active', b.dataset.cols === btn.dataset.cols));
     const cardsEl = el.querySelector('#deck-cards');
