@@ -625,7 +625,7 @@ function openTagEditor(anchorEl, cardName, state, handlers) {
   // Remove any existing tag editor
   document.querySelectorAll('.tag-editor').forEach(e => e.remove());
 
-  const allCards = [...(state.cards || []), ...(state.considering || [])];
+  const allCards = [...(state.cards || []), ...(state.considering || []), ...(state.skippedRecommendations || [])];
   const existingTags = [...new Set(allCards.map(c => c.tag).filter(Boolean))].sort();
   const currentTag = allCards.find(c => c.name === cardName)?.tag;
 
@@ -1297,6 +1297,7 @@ function updateConsideringDisplay(el, state) {
 
 let _dismissedHandlers = null;
 let _dismissedState = null;
+const dismissedCollapsedGroups = new Set();
 
 export function renderDismissedPanel(state, handlers) {
   const el = document.getElementById('dismissed-panel');
@@ -1320,20 +1321,52 @@ function buildDismissedPanel(el, state, handlers) {
     </div>
   `;
 
+  // Event delegation on cards container
   el.querySelector('#dismissed-cards').addEventListener('click', (e) => {
-    // Card image click — fullscreen overlay
-    const recCard = e.target.closest('.rec-card');
-    if (recCard && e.target.tagName === 'IMG') {
-      showCardOverlay(e.target.src, recCard.dataset.card);
+    // Stack header collapse/expand
+    const stackHeader = e.target.closest('.card-stack-header');
+    if (stackHeader) {
+      const group = stackHeader.dataset.group;
+      const items = stackHeader.nextElementSibling;
+      const arrow = stackHeader.querySelector('.section-arrow');
+      if (dismissedCollapsedGroups.has(group)) {
+        dismissedCollapsedGroups.delete(group);
+        items.hidden = false;
+        arrow.textContent = '\u25BC';
+      } else {
+        dismissedCollapsedGroups.add(group);
+        items.hidden = true;
+        arrow.textContent = '\u25B6';
+      }
       return;
     }
 
-    const btn = e.target.closest('button[data-action]');
-    if (!btn) return;
-    const cardName = btn.dataset.card;
-    const action = btn.dataset.action;
-    if (action === 'restore' && _dismissedHandlers.onRestoreDismissed) _dismissedHandlers.onRestoreDismissed(cardName);
-    if (action === 'add' && _dismissedHandlers.onAddFromDismissed) _dismissedHandlers.onAddFromDismissed(cardName);
+    // Card options menu
+    const optionsBtn = e.target.closest('.card-options-btn');
+    if (optionsBtn) {
+      e.stopPropagation();
+      const cardName = optionsBtn.dataset.card;
+      if (cardName) openDismissedOptionsMenu(optionsBtn, cardName);
+      return;
+    }
+
+    // Card image click — inline expand (stacks) or full overlay (grid)
+    const cardItem = e.target.closest('.card-stack-item, .deck-grid-item');
+    if (cardItem) {
+      if (cardItem.classList.contains('card-stack-item')) {
+        const wasExpanded = cardItem.classList.contains('expanded');
+        if (wasExpanded) {
+          const img = cardItem.querySelector('img');
+          if (img && img.src) showCardOverlay(img.src, cardItem.dataset.card);
+        } else {
+          el.querySelectorAll('.card-stack-item.expanded').forEach(c => c.classList.remove('expanded'));
+          cardItem.classList.add('expanded');
+        }
+      } else {
+        const img = cardItem.querySelector('img');
+        if (img && img.src) showCardOverlay(img.src, cardItem.dataset.card);
+      }
+    }
   });
 }
 
@@ -1341,28 +1374,82 @@ function updateDismissedDisplay(el, state) {
   const cardsEl = el.querySelector('#dismissed-cards');
   if (!cardsEl) return;
 
-  if (state.skippedRecommendations.length === 0) {
+  // Normalize: filter out any legacy string entries without scryfallData
+  const dismissedCards = state.skippedRecommendations.filter(c => c && c.scryfallData);
+
+  if (dismissedCards.length === 0) {
     cardsEl.innerHTML = '<div class="empty-state">Dismissed cards will appear here</div>';
     return;
   }
 
-  cardsEl.innerHTML = state.skippedRecommendations.map(card => {
-    const name = card.name || card;
-    const imgUrl = card.scryfallData?.imageUris?.normal || '';
+  const renderOpts = { collapsedSet: dismissedCollapsedGroups };
+  const groups = groupCards(dismissedCards, deckGrouping);
 
-    return `
-      <div class="rec-card" data-card="${escapeAttr(name)}">
-        ${imgUrl ? `<img class="card-image" src="${imgUrl}" alt="${escapeAttr(name)}" loading="lazy">` : ''}
-        <div class="rec-card-info">
-          <p class="rec-pitch" style="color:var(--text-primary)">${escapeHtml(name)}</p>
-          ${card.pitch ? `<p class="rec-pitch">${escapeHtml(card.pitch)}</p>` : ''}
-        </div>
-        <div class="action-buttons">
-          <button class="btn btn-sm" data-action="restore" data-card="${escapeAttr(name)}">Restore</button>
-          ${imgUrl ? `<button class="btn btn-sm btn-success" data-action="add" data-card="${escapeAttr(name)}">Add to Deck</button>` : ''}
-        </div>
-      </div>`;
-  }).join('');
+  if (deckViewMode === 'stacks') {
+    cardsEl.innerHTML = groups.map(g => renderStackGroup(g, renderOpts)).join('');
+  } else {
+    cardsEl.innerHTML = groups.map(g => renderGridGroup(g, renderOpts)).join('');
+  }
+
+  if (mobileDoubleColumn) {
+    cardsEl.classList.add('mobile-two-col');
+  } else {
+    cardsEl.classList.remove('mobile-two-col');
+  }
+}
+
+function openDismissedOptionsMenu(anchorEl, cardName) {
+  document.querySelectorAll('.card-options-menu').forEach(e => e.remove());
+
+  const card = _dismissedState?.skippedRecommendations.find(c => (c.name || c) === cardName);
+  if (!card) return;
+
+  const menuItems = `
+    <div class="card-options-item" data-action="add">Add to Deck</div>
+    <div class="card-options-item" data-action="consider">Move to Considering</div>
+    <div class="card-options-item" data-action="remove">Remove</div>
+    <div class="card-options-item" data-action="tags">Manage Tags</div>`;
+
+  const menu = document.createElement('div');
+  menu.className = 'card-options-menu';
+  menu.innerHTML = menuItems;
+
+  const rect = anchorEl.getBoundingClientRect();
+  menu.style.position = 'fixed';
+  menu.style.top = `${rect.bottom + 4}px`;
+  menu.style.left = `${rect.left - 120}px`;
+  document.body.appendChild(menu);
+
+  requestAnimationFrame(() => {
+    const menuRect = menu.getBoundingClientRect();
+    if (menuRect.left < 8) menu.style.left = '8px';
+    if (menuRect.bottom > window.innerHeight - 8) {
+      menu.style.top = `${rect.top - menuRect.height - 4}px`;
+    }
+  });
+
+  menu.addEventListener('click', (e) => {
+    const item = e.target.closest('.card-options-item');
+    if (!item) return;
+    const action = item.dataset.action;
+    if (action === 'add') _dismissedHandlers?.onAddFromDismissed?.(cardName);
+    if (action === 'consider') _dismissedHandlers?.onConsiderFromDismissed?.(cardName);
+    if (action === 'remove') _dismissedHandlers?.onRemoveDismissed?.(cardName);
+    if (action === 'tags') {
+      openTagEditor(anchorEl, cardName, _dismissedState, _dismissedHandlers);
+    }
+    menu.remove();
+  });
+
+  setTimeout(() => {
+    const closeHandler = (e) => {
+      if (!menu.contains(e.target) && e.target !== anchorEl) {
+        menu.remove();
+        document.removeEventListener('click', closeHandler);
+      }
+    };
+    document.addEventListener('click', closeHandler);
+  }, 0);
 }
 
 // ============================================================

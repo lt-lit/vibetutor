@@ -230,6 +230,11 @@ const handlers = {
         c.name === cardName ? { ...c, tag: newTag } : c
       );
     }
+    if (state.skippedRecommendations.some(c => c.name === cardName)) {
+      updates.skippedRecommendations = state.skippedRecommendations.map(c =>
+        c.name === cardName ? { ...c, tag: newTag } : c
+      );
+    }
     updateState(updates);
   },
 
@@ -491,11 +496,11 @@ const handlers = {
 
   // ---- Dismissed handlers ----
 
-  onRestoreDismissed(cardName) {
+  onRemoveDismissed(cardName) {
     updateState({
       skippedRecommendations: state.skippedRecommendations.filter(c => (c.name || c) !== cardName),
     });
-    ui.showToast(`${cardName} restored — will appear in future recommendations`);
+    ui.showToast(`${cardName} removed — will appear in future recommendations`);
   },
 
   onAddFromDismissed(cardName) {
@@ -517,6 +522,26 @@ const handlers = {
       });
       ui.showToast(`Added ${cardName} to deck`);
     }
+  },
+
+  onConsiderFromDismissed(cardName) {
+    const card = state.skippedRecommendations.find(c => (c.name || c) === cardName);
+    if (!card || typeof card === 'string') return;
+
+    const considerCard = {
+      name: card.name,
+      tag: card.tag || null,
+      scryfallData: card.scryfallData,
+      aiText: card.pitch,
+      source: 'dismissed',
+      inDeck: false,
+      sources: card.sources || [],
+    };
+    updateState({
+      considering: [...state.considering, considerCard],
+      skippedRecommendations: state.skippedRecommendations.filter(c => (c.name || c) !== cardName),
+    });
+    ui.showToast(`${cardName} moved to Considering`);
   },
 };
 
