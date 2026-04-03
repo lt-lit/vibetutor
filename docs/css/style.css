@@ -1044,10 +1044,15 @@ select.input {
   border-radius: var(--border-radius);
   overflow: hidden;
   background: var(--bg-card);
+  display: flex;
+  align-items: flex-start;
 }
 
 .rec-card .card-image {
   border-radius: 0;
+  width: 160px;
+  min-width: 160px;
+  cursor: pointer;
 }
 
 .rec-card-info {
@@ -1055,6 +1060,8 @@ select.input {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  flex: 1;
+  min-width: 0;
 }
 
 .rec-pitch {
@@ -1304,7 +1311,7 @@ select.input {
 
   #recs-results {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
     gap: 16px;
   }
 

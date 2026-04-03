@@ -265,7 +265,7 @@ ${userPrompt ? `User is looking for: "${userPrompt}"` : 'User wants general reco
 CANDIDATE POOL (pick ONLY from these cards):
 ${poolSummary}
 
-Pick 3-5 cards from the pool above. For each, include a suggested tag (reuse existing tags where appropriate) and a 1-2 sentence pitch explaining why this card is good for this deck.
+Pick up to 10 cards from the pool above. For each, include a suggested tag (reuse existing tags where appropriate) and a 1-2 sentence pitch explaining why this card is good for this deck.
 
 Respond with JSON:
 {
@@ -298,7 +298,7 @@ Cards user has chosen to KEEP (do NOT suggest cutting these): ${kept}
 Current deck (${deckState.cards.length} cards):
 ${cardSummary}
 
-Identify 3-5 cards that are the weakest performers in this deck. Consider: synergy with the commander/strategy, mana curve efficiency, EDHREC inclusion rates, and whether the card's role is redundant.
+Identify up to 10 cards that are the weakest performers in this deck. Consider: synergy with the commander/strategy, mana curve efficiency, EDHREC inclusion rates, and whether the card's role is redundant.
 
 Respond with JSON:
 {
