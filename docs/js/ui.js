@@ -1016,23 +1016,6 @@ export function renderRecommendationsPanel(state, handlers) {
 function buildRecommendationsPanel(el, state, handlers) {
   el.innerHTML = `
     <div class="recs-content">
-      <div class="recs-settings">
-        <div class="flex gap-md" style="flex-wrap:wrap">
-          <div class="field-group" style="flex:1;min-width:200px">
-            <label class="field-label">Power Level</label>
-            <div class="segmented-control" id="power-level-control">
-              <button data-level="casual">Casual</button>
-              <button data-level="mid">Mid</button>
-              <button data-level="high">High</button>
-              <button data-level="cedh">cEDH</button>
-            </div>
-          </div>
-          <div class="field-group">
-            <label class="field-label" for="budget-cap">Budget Cap ($/card)</label>
-            <input type="number" id="budget-cap" class="input" min="0" step="0.5" placeholder="No limit">
-          </div>
-        </div>
-      </div>
       <div class="recs-input-area">
         <div class="flex gap-sm">
           <input type="text" id="recs-prompt" class="input" style="flex:1"
@@ -1042,6 +1025,23 @@ function buildRecommendationsPanel(el, state, handlers) {
         </div>
         <p class="field-hint mt-sm" id="recs-hint">Try: removal, wheel effects, budget ramp under $2, the saltiest cards available</p>
         <div id="recs-recent-prompts" class="mt-sm"></div>
+      </div>
+      <div class="recs-settings">
+        <div class="flex gap-md" style="flex-wrap:wrap;align-items:flex-end">
+          <div class="field-group" style="flex:1;min-width:200px">
+            <label class="field-label">Power Level</label>
+            <div class="segmented-control" id="power-level-control">
+              <button data-level="casual">Casual</button>
+              <button data-level="mid">Mid</button>
+              <button data-level="high">High</button>
+              <button data-level="cedh">cEDH</button>
+            </div>
+          </div>
+          <div class="field-group" style="flex-direction:row;align-items:center;gap:8px">
+            <label class="field-label" for="budget-cap" style="white-space:nowrap;margin:0">Budget Cap ($/card)</label>
+            <input type="number" id="budget-cap" class="input" min="0" step="0.5" placeholder="No limit" style="width:100px">
+          </div>
+        </div>
       </div>
       <div id="recs-results"></div>
     </div>
