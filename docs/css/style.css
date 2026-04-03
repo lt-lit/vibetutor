@@ -496,10 +496,12 @@ select.input {
   display: flex;
   gap: 8px;
   margin-top: 8px;
+  flex-wrap: wrap;
 }
 
 .action-buttons .btn {
   flex: 1;
+  min-width: 0;
 }
 
 /* ===== Dropdown ===== */
@@ -1044,10 +1046,21 @@ select.input {
   border-radius: var(--border-radius);
   overflow: hidden;
   background: var(--bg-card);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.rec-card > .action-buttons {
+  width: 100%;
+  padding: 0 12px 12px;
 }
 
 .rec-card .card-image {
   border-radius: 0;
+  width: 160px;
+  min-width: 160px;
+  cursor: pointer;
 }
 
 .rec-card-info {
@@ -1055,6 +1068,8 @@ select.input {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  flex: 1;
+  min-width: 0;
 }
 
 .rec-pitch {
@@ -1270,14 +1285,16 @@ select.input {
 /* ===== Mobile Two-Column Stacks ===== */
 @media (max-width: 767px) {
   #deck-cards.mobile-two-col,
-  #considering-cards.mobile-two-col {
+  #considering-cards.mobile-two-col,
+  #dismissed-cards.mobile-two-col {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
   }
 
   #deck-cards.mobile-two-col .card-stack,
-  #considering-cards.mobile-two-col .card-stack {
+  #considering-cards.mobile-two-col .card-stack,
+  #dismissed-cards.mobile-two-col .card-stack {
     width: calc(50% - 4px);
   }
 }
@@ -1304,7 +1321,7 @@ select.input {
 
   #recs-results {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
     gap: 16px;
   }
 

@@ -341,9 +341,11 @@ function buildDeckPanel(el, state, handlers) {
     el.querySelectorAll('#deck-view-toggle button').forEach(b =>
       b.classList.toggle('active', b.dataset.view === deckViewMode));
     updateDeckDisplay(el, _deckState);
-    // Also update considering panel with same view mode
+    // Also update considering and dismissed panels with same view mode
     const consideringEl = document.getElementById('considering-panel');
     if (consideringEl && _consideringState) updateConsideringDisplay(consideringEl, _consideringState);
+    const dismissedEl = document.getElementById('dismissed-panel');
+    if (dismissedEl && _dismissedState) updateDismissedDisplay(dismissedEl, _dismissedState);
   });
 
   // --- Grouping toggle ---
@@ -356,10 +358,13 @@ function buildDeckPanel(el, state, handlers) {
       b.classList.toggle('active', b.dataset.group === deckGrouping));
     collapsedGroups.clear();
     consideringCollapsedGroups.clear();
+    dismissedCollapsedGroups.clear();
     updateDeckDisplay(el, _deckState);
-    // Also update considering panel with same grouping
+    // Also update considering and dismissed panels with same grouping
     const consideringEl = document.getElementById('considering-panel');
     if (consideringEl && _consideringState) updateConsideringDisplay(consideringEl, _consideringState);
+    const dismissedEl = document.getElementById('dismissed-panel');
+    if (dismissedEl && _dismissedState) updateDismissedDisplay(dismissedEl, _dismissedState);
   });
 
   // --- Sorting toggle ---
@@ -373,6 +378,8 @@ function buildDeckPanel(el, state, handlers) {
     updateDeckDisplay(el, _deckState);
     const consideringEl = document.getElementById('considering-panel');
     if (consideringEl && _consideringState) updateConsideringDisplay(consideringEl, _consideringState);
+    const dismissedEl = document.getElementById('dismissed-panel');
+    if (dismissedEl && _dismissedState) updateDismissedDisplay(dismissedEl, _dismissedState);
   });
 
   // --- Import ---
@@ -407,9 +414,11 @@ function buildDeckPanel(el, state, handlers) {
       b.classList.toggle('active', b.dataset.cols === btn.dataset.cols));
     const cardsEl = el.querySelector('#deck-cards');
     cardsEl.classList.toggle('mobile-two-col', mobileDoubleColumn);
-    // Also update considering panel
+    // Also update considering and dismissed panels
     const consideringEl = document.getElementById('considering-panel');
     if (consideringEl && _consideringState) updateConsideringDisplay(consideringEl, _consideringState);
+    const dismissedEl = document.getElementById('dismissed-panel');
+    if (dismissedEl && _dismissedState) updateDismissedDisplay(dismissedEl, _dismissedState);
   });
 
   // --- Event delegation on cards container ---
@@ -446,8 +455,13 @@ function buildDeckPanel(el, state, handlers) {
     if (cardItem) {
       if (cardItem.classList.contains('card-stack-item')) {
         const wasExpanded = cardItem.classList.contains('expanded');
-        el.querySelectorAll('.card-stack-item.expanded').forEach(c => c.classList.remove('expanded'));
-        if (!wasExpanded) cardItem.classList.add('expanded');
+        if (wasExpanded) {
+          const img = cardItem.querySelector('img');
+          if (img && img.src) showCardOverlay(img.src, cardItem.dataset.card);
+        } else {
+          el.querySelectorAll('.card-stack-item.expanded').forEach(c => c.classList.remove('expanded'));
+          cardItem.classList.add('expanded');
+        }
       } else {
         const img = cardItem.querySelector('img');
         if (img && img.src) showCardOverlay(img.src, cardItem.dataset.card);
@@ -620,7 +634,7 @@ function openTagEditor(anchorEl, cardName, state, handlers) {
   // Remove any existing tag editor
   document.querySelectorAll('.tag-editor').forEach(e => e.remove());
 
-  const allCards = [...(state.cards || []), ...(state.considering || [])];
+  const allCards = [...(state.cards || []), ...(state.considering || []), ...(state.skippedRecommendations || [])];
   const existingTags = [...new Set(allCards.map(c => c.tag).filter(Boolean))].sort();
   const currentTag = allCards.find(c => c.name === cardName)?.tag;
 
@@ -960,14 +974,6 @@ function buildRecommendationsPanel(el, state, handlers) {
         <div id="recs-recent-prompts" class="mt-sm"></div>
       </div>
       <div id="recs-results"></div>
-      <div id="recs-skipped" hidden>
-        <div class="card-stack-header" id="recs-skipped-header" style="cursor:pointer">
-          <span class="section-arrow">\u25B6</span>
-          <span>Skipped cards</span>
-          <span class="stack-count" id="recs-skipped-count"></span>
-        </div>
-        <div id="recs-skipped-list" hidden></div>
-      </div>
     </div>
   `;
 
@@ -995,6 +1001,13 @@ function buildRecommendationsPanel(el, state, handlers) {
 
   // Event delegation on results
   el.querySelector('#recs-results').addEventListener('click', (e) => {
+    // Card image click — fullscreen overlay
+    const recCard = e.target.closest('.rec-card');
+    if (recCard && e.target.tagName === 'IMG') {
+      showCardOverlay(e.target.src, recCard.dataset.card);
+      return;
+    }
+
     const btn = e.target.closest('button[data-action]');
     if (!btn) return;
     const cardName = btn.dataset.card;
@@ -1004,13 +1017,6 @@ function buildRecommendationsPanel(el, state, handlers) {
     if (action === 'skip' && _recsHandlers.onSkipRecommendation) _recsHandlers.onSkipRecommendation(cardName);
   });
 
-  // Skipped section toggle
-  el.querySelector('#recs-skipped-header').addEventListener('click', () => {
-    const list = el.querySelector('#recs-skipped-list');
-    const arrow = el.querySelector('#recs-skipped-header .section-arrow');
-    list.hidden = !list.hidden;
-    arrow.textContent = list.hidden ? '\u25B6' : '\u25BC';
-  });
 }
 
 function updateRecommendationsDisplay(el, state) {
@@ -1075,25 +1081,15 @@ function updateRecommendationsDisplay(el, state) {
           </div>
           <p class="rec-pitch">${escapeHtml(rec.pitch || '')}</p>
           ${metaInfo}
-          <div class="action-buttons">
-            <button class="btn btn-sm btn-success" data-action="add" data-card="${escapeAttr(rec.name)}">Add</button>
-            <button class="btn btn-sm btn-warning" data-action="consider" data-card="${escapeAttr(rec.name)}">Consider</button>
-            <button class="btn btn-sm" data-action="skip" data-card="${escapeAttr(rec.name)}">Skip</button>
-          </div>
+        </div>
+        <div class="action-buttons">
+          <button class="btn btn-sm btn-danger" data-action="skip" data-card="${escapeAttr(rec.name)}">Dismiss</button>
+          <button class="btn btn-sm btn-warning" data-action="consider" data-card="${escapeAttr(rec.name)}">Consider</button>
+          <button class="btn btn-sm btn-success" data-action="add" data-card="${escapeAttr(rec.name)}">Add</button>
         </div>
       </div>`;
   }).join('');
 
-  // Skipped list
-  const skippedContainer = el.querySelector('#recs-skipped');
-  if (state.skippedRecommendations.length > 0) {
-    skippedContainer.hidden = false;
-    el.querySelector('#recs-skipped-count').textContent = `(${state.skippedRecommendations.length})`;
-    el.querySelector('#recs-skipped-list').innerHTML = state.skippedRecommendations
-      .map(name => `<div class="field-hint" style="padding:2px 0">${escapeHtml(name)}</div>`).join('');
-  } else {
-    skippedContainer.hidden = true;
-  }
 }
 
 // ============================================================
@@ -1133,6 +1129,13 @@ function buildCutsPanel(el, state, handlers) {
   });
 
   el.querySelector('#cuts-results').addEventListener('click', (e) => {
+    // Card image click — fullscreen overlay
+    const recCard = e.target.closest('.rec-card');
+    if (recCard && e.target.tagName === 'IMG') {
+      showCardOverlay(e.target.src, recCard.dataset.card);
+      return;
+    }
+
     const btn = e.target.closest('button[data-action]');
     if (!btn) return;
     const cardName = btn.dataset.card;
@@ -1183,11 +1186,11 @@ function updateCutsDisplay(el, state) {
         <div class="rec-card-info">
           <p class="rec-pitch">${escapeHtml(cut.reason || '')}</p>
           ${metaInfo}
-          <div class="action-buttons">
-            <button class="btn btn-sm btn-danger" data-action="cut" data-card="${escapeAttr(cut.name)}">Cut</button>
-            <button class="btn btn-sm btn-warning" data-action="consider" data-card="${escapeAttr(cut.name)}">Consider</button>
-            <button class="btn btn-sm" data-action="keep" data-card="${escapeAttr(cut.name)}">Keep</button>
-          </div>
+        </div>
+        <div class="action-buttons">
+          <button class="btn btn-sm btn-danger" data-action="cut" data-card="${escapeAttr(cut.name)}">Cut</button>
+          <button class="btn btn-sm btn-warning" data-action="consider" data-card="${escapeAttr(cut.name)}">Consider</button>
+          <button class="btn btn-sm" data-action="keep" data-card="${escapeAttr(cut.name)}">Keep</button>
         </div>
       </div>`;
   }).join('');
@@ -1257,8 +1260,13 @@ function buildConsideringPanel(el, state, handlers) {
     if (cardItem) {
       if (cardItem.classList.contains('card-stack-item')) {
         const wasExpanded = cardItem.classList.contains('expanded');
-        el.querySelectorAll('.card-stack-item.expanded').forEach(c => c.classList.remove('expanded'));
-        if (!wasExpanded) cardItem.classList.add('expanded');
+        if (wasExpanded) {
+          const img = cardItem.querySelector('img');
+          if (img && img.src) showCardOverlay(img.src, cardItem.dataset.card);
+        } else {
+          el.querySelectorAll('.card-stack-item.expanded').forEach(c => c.classList.remove('expanded'));
+          cardItem.classList.add('expanded');
+        }
       } else {
         const img = cardItem.querySelector('img');
         if (img && img.src) showCardOverlay(img.src, cardItem.dataset.card);
@@ -1290,6 +1298,167 @@ function updateConsideringDisplay(el, state) {
   } else {
     cardsEl.classList.remove('mobile-two-col');
   }
+}
+
+// ============================================================
+// DISMISSED PANEL
+// ============================================================
+
+let _dismissedHandlers = null;
+let _dismissedState = null;
+const dismissedCollapsedGroups = new Set();
+
+export function renderDismissedPanel(state, handlers) {
+  const el = document.getElementById('dismissed-panel');
+  if (!el) return;
+
+  _dismissedHandlers = handlers;
+  _dismissedState = state;
+
+  if (!initialized.has('dismissed')) {
+    initialized.add('dismissed');
+    buildDismissedPanel(el, state, handlers);
+  }
+
+  updateDismissedDisplay(el, state);
+}
+
+function buildDismissedPanel(el, state, handlers) {
+  el.innerHTML = `
+    <div class="dismissed-content">
+      <div id="dismissed-cards"></div>
+    </div>
+  `;
+
+  // Event delegation on cards container
+  el.querySelector('#dismissed-cards').addEventListener('click', (e) => {
+    // Stack header collapse/expand
+    const stackHeader = e.target.closest('.card-stack-header');
+    if (stackHeader) {
+      const group = stackHeader.dataset.group;
+      const items = stackHeader.nextElementSibling;
+      const arrow = stackHeader.querySelector('.section-arrow');
+      if (dismissedCollapsedGroups.has(group)) {
+        dismissedCollapsedGroups.delete(group);
+        items.hidden = false;
+        arrow.textContent = '\u25BC';
+      } else {
+        dismissedCollapsedGroups.add(group);
+        items.hidden = true;
+        arrow.textContent = '\u25B6';
+      }
+      return;
+    }
+
+    // Card options menu
+    const optionsBtn = e.target.closest('.card-options-btn');
+    if (optionsBtn) {
+      e.stopPropagation();
+      const cardName = optionsBtn.dataset.card;
+      if (cardName) openDismissedOptionsMenu(optionsBtn, cardName);
+      return;
+    }
+
+    // Card image click — inline expand (stacks) or full overlay (grid)
+    const cardItem = e.target.closest('.card-stack-item, .deck-grid-item');
+    if (cardItem) {
+      if (cardItem.classList.contains('card-stack-item')) {
+        const wasExpanded = cardItem.classList.contains('expanded');
+        if (wasExpanded) {
+          const img = cardItem.querySelector('img');
+          if (img && img.src) showCardOverlay(img.src, cardItem.dataset.card);
+        } else {
+          el.querySelectorAll('.card-stack-item.expanded').forEach(c => c.classList.remove('expanded'));
+          cardItem.classList.add('expanded');
+        }
+      } else {
+        const img = cardItem.querySelector('img');
+        if (img && img.src) showCardOverlay(img.src, cardItem.dataset.card);
+      }
+    }
+  });
+}
+
+function updateDismissedDisplay(el, state) {
+  const cardsEl = el.querySelector('#dismissed-cards');
+  if (!cardsEl) return;
+
+  // Normalize: filter out any legacy string entries without scryfallData
+  const dismissedCards = state.skippedRecommendations.filter(c => c && c.scryfallData);
+
+  if (dismissedCards.length === 0) {
+    cardsEl.innerHTML = '<div class="empty-state">Dismissed cards will appear here</div>';
+    return;
+  }
+
+  const renderOpts = { collapsedSet: dismissedCollapsedGroups };
+  const groups = groupCards(dismissedCards, deckGrouping);
+
+  if (deckViewMode === 'stacks') {
+    cardsEl.innerHTML = groups.map(g => renderStackGroup(g, renderOpts)).join('');
+  } else {
+    cardsEl.innerHTML = groups.map(g => renderGridGroup(g, renderOpts)).join('');
+  }
+
+  if (mobileDoubleColumn) {
+    cardsEl.classList.add('mobile-two-col');
+  } else {
+    cardsEl.classList.remove('mobile-two-col');
+  }
+}
+
+function openDismissedOptionsMenu(anchorEl, cardName) {
+  document.querySelectorAll('.card-options-menu').forEach(e => e.remove());
+
+  const card = _dismissedState?.skippedRecommendations.find(c => (c.name || c) === cardName);
+  if (!card) return;
+
+  const menuItems = `
+    <div class="card-options-item" data-action="add">Add to Deck</div>
+    <div class="card-options-item" data-action="consider">Move to Considering</div>
+    <div class="card-options-item" data-action="remove">Remove</div>
+    <div class="card-options-item" data-action="tags">Manage Tags</div>`;
+
+  const menu = document.createElement('div');
+  menu.className = 'card-options-menu';
+  menu.innerHTML = menuItems;
+
+  const rect = anchorEl.getBoundingClientRect();
+  menu.style.position = 'fixed';
+  menu.style.top = `${rect.bottom + 4}px`;
+  menu.style.left = `${rect.left - 120}px`;
+  document.body.appendChild(menu);
+
+  requestAnimationFrame(() => {
+    const menuRect = menu.getBoundingClientRect();
+    if (menuRect.left < 8) menu.style.left = '8px';
+    if (menuRect.bottom > window.innerHeight - 8) {
+      menu.style.top = `${rect.top - menuRect.height - 4}px`;
+    }
+  });
+
+  menu.addEventListener('click', (e) => {
+    const item = e.target.closest('.card-options-item');
+    if (!item) return;
+    const action = item.dataset.action;
+    if (action === 'add') _dismissedHandlers?.onAddFromDismissed?.(cardName);
+    if (action === 'consider') _dismissedHandlers?.onConsiderFromDismissed?.(cardName);
+    if (action === 'remove') _dismissedHandlers?.onRemoveDismissed?.(cardName);
+    if (action === 'tags') {
+      openTagEditor(anchorEl, cardName, _dismissedState, _dismissedHandlers);
+    }
+    menu.remove();
+  });
+
+  setTimeout(() => {
+    const closeHandler = (e) => {
+      if (!menu.contains(e.target) && e.target !== anchorEl) {
+        menu.remove();
+        document.removeEventListener('click', closeHandler);
+      }
+    };
+    document.addEventListener('click', closeHandler);
+  }, 0);
 }
 
 // ============================================================
