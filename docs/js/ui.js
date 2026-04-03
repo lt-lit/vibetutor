@@ -19,6 +19,132 @@ function debounce(fn, ms) {
 }
 
 // ============================================================
+// MY DECKS PANEL
+// ============================================================
+
+export function renderMyDecksPanel(state, decks, handlers) {
+  const el = document.getElementById('mydecks-panel');
+  if (!el) return;
+
+  if (!initialized.has('mydecks')) {
+    initialized.add('mydecks');
+    buildMyDecksPanel(el, state, decks, handlers);
+  }
+
+  updateMyDecksDisplay(el, state, decks);
+}
+
+function buildMyDecksPanel(el, state, decks, handlers) {
+  el.innerHTML = `
+    <div class="mydecks-content">
+      <button class="btn btn-primary" id="mydecks-new-btn">+ New Deck</button>
+      <div id="mydecks-list"></div>
+    </div>
+  `;
+
+  el.querySelector('#mydecks-new-btn').addEventListener('click', () => {
+    handlers.onNewDeck();
+  });
+
+  // Event delegation on deck list
+  el.querySelector('#mydecks-list').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-action]');
+    if (!btn) return;
+    const deckId = btn.dataset.deck;
+    const action = btn.dataset.action;
+    if (action === 'load') handlers.onLoadDeck(deckId);
+    if (action === 'duplicate') handlers.onDuplicateDeck(deckId);
+    if (action === 'delete') {
+      if (confirm('Delete this deck? This cannot be undone.')) {
+        handlers.onDeleteDeck(deckId);
+      }
+    }
+    if (action === 'rename') {
+      const tile = btn.closest('.deck-tile');
+      const nameEl = tile?.querySelector('.deck-tile-name');
+      if (nameEl) {
+        nameEl.contentEditable = 'true';
+        nameEl.focus();
+        // Select all text
+        const range = document.createRange();
+        range.selectNodeContents(nameEl);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+    }
+  });
+
+  // Handle inline rename via contenteditable
+  el.querySelector('#mydecks-list').addEventListener('keydown', (e) => {
+    if (e.target.classList.contains('deck-tile-name') && e.key === 'Enter') {
+      e.preventDefault();
+      e.target.blur();
+    }
+  });
+
+  el.querySelector('#mydecks-list').addEventListener('focusout', (e) => {
+    if (e.target.classList.contains('deck-tile-name') && e.target.contentEditable === 'true') {
+      e.target.contentEditable = 'false';
+      const deckId = e.target.dataset.deck;
+      const newName = e.target.textContent.trim();
+      if (newName && deckId) {
+        handlers.onRenameDeck(deckId, newName);
+      }
+    }
+  });
+}
+
+function updateMyDecksDisplay(el, state, decks) {
+  const listEl = el.querySelector('#mydecks-list');
+  if (!listEl) return;
+
+  if (decks.length === 0) {
+    listEl.innerHTML = '<p class="field-hint" style="margin-top:12px">No saved decks yet. Select a commander to start your first deck.</p>';
+    return;
+  }
+
+  // Sort by last modified, most recent first
+  const sorted = [...decks].sort((a, b) => (b.lastModified || 0) - (a.lastModified || 0));
+
+  listEl.innerHTML = sorted.map(deck => {
+    const isActive = deck.deckId === state.deckId;
+    const imgUrl = deck.commander?.imageUri || '';
+    const cardCount = deck.cards?.length || 0;
+    const powerLevel = deck.strategy?.powerLevel || 'mid';
+    const lastMod = deck.lastModified ? formatTimeAgo(deck.lastModified) : '';
+
+    return `
+      <div class="deck-tile${isActive ? ' deck-tile-active' : ''}" data-deck="${escapeAttr(deck.deckId)}">
+        ${imgUrl ? `<img class="card-image" src="${imgUrl}" alt="${escapeAttr(deck.deckName || 'Commander')}" loading="lazy">` : '<div class="deck-tile-no-img"></div>'}
+        <div class="deck-tile-info">
+          <span class="deck-tile-name" data-deck="${escapeAttr(deck.deckId)}">${escapeHtml(deck.deckName || 'Untitled')}</span>
+          <span class="field-hint">${cardCount}/99 cards &middot; ${escapeHtml(powerLevel)}${lastMod ? ' &middot; ' + lastMod : ''}</span>
+          ${isActive ? '<span class="tag-badge" style="background:var(--accent-success);color:#000;width:fit-content">Active</span>' : ''}
+        </div>
+        <div class="action-buttons">
+          ${isActive ? '' : `<button class="btn btn-sm btn-primary" data-action="load" data-deck="${escapeAttr(deck.deckId)}">Load</button>`}
+          <button class="btn btn-sm" data-action="rename" data-deck="${escapeAttr(deck.deckId)}">Rename</button>
+          <button class="btn btn-sm" data-action="duplicate" data-deck="${escapeAttr(deck.deckId)}">Duplicate</button>
+          <button class="btn btn-sm btn-danger" data-action="delete" data-deck="${escapeAttr(deck.deckId)}">Delete</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function formatTimeAgo(timestamp) {
+  const seconds = Math.floor((Date.now() - timestamp) / 1000);
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return new Date(timestamp).toLocaleDateString();
+}
+
+// ============================================================
 // STRATEGY PANEL
 // ============================================================
 
