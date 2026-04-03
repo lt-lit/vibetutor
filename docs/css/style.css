@@ -10,7 +10,7 @@
   --text-secondary: #a0a0b8;
   --text-muted: #6c6c88;
 
-  --accent-primary: #7c5cbf;
+  --accent-primary: #5c8cbf;
   --accent-secondary: #5c9cf5;
   --accent-success: #4caf50;
   --accent-warning: #f5a623;
@@ -37,6 +37,12 @@
 
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --font-mono: 'SF Mono', 'Fira Code', 'Fira Mono', Menlo, Consolas, monospace;
+
+  /* Section color tokens (defaults, overridden per-section) */
+  --section-header-bg: var(--bg-secondary);
+  --section-header-hover: var(--bg-hover);
+  --section-content-bg: var(--bg-primary);
+  --section-accent: var(--border-color);
 }
 
 /* ===== Reset & Base ===== */
@@ -125,7 +131,7 @@ body {
 
 /* ===== Section ===== */
 .section {
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--section-accent);
 }
 
 .section-header {
@@ -137,12 +143,12 @@ body {
   cursor: pointer;
   user-select: none;
   -webkit-user-select: none;
-  background: var(--bg-secondary);
+  background: var(--section-header-bg);
   transition: background var(--transition-fast);
 }
 
 .section-header:hover {
-  background: var(--bg-hover);
+  background: var(--section-header-hover);
 }
 
 .section-header:focus-visible {
@@ -169,7 +175,7 @@ body {
 .section-badge {
   font-size: 0.75rem;
   color: var(--text-secondary);
-  background: var(--bg-card);
+  background: var(--section-accent);
   padding: 2px 8px;
   border-radius: 10px;
   flex-shrink: 0;
@@ -194,11 +200,50 @@ body {
 
 .section-content {
   padding: 16px;
-  background: var(--bg-primary);
+  background: var(--section-content-bg);
+  border-left: 3px solid var(--section-accent);
 }
 
 .section.collapsed .section-content {
   display: none;
+}
+
+/* ===== Per-Section Color Coding ===== */
+[data-section="mydecks"],
+[data-section="deck"],
+[data-section="stats"] {
+  --section-header-bg: #1e2235;
+  --section-header-hover: #252a40;
+  --section-content-bg: #1b1c2f;
+  --section-accent: #3a3f55;
+}
+
+[data-section="considering"] {
+  --section-header-bg: #2a2518;
+  --section-header-hover: #352e20;
+  --section-content-bg: #211f1a;
+  --section-accent: #6b5a2e;
+}
+
+[data-section="dismissed"] {
+  --section-header-bg: #2a1a1e;
+  --section-header-hover: #352025;
+  --section-content-bg: #211a1c;
+  --section-accent: #6b2e38;
+}
+
+[data-section="recommendations"] {
+  --section-header-bg: #1a2a1e;
+  --section-header-hover: #203528;
+  --section-content-bg: #1a211c;
+  --section-accent: #2e6b3a;
+}
+
+[data-section="cuts"] {
+  --section-header-bg: #2a2018;
+  --section-header-hover: #352a20;
+  --section-content-bg: #211e1a;
+  --section-accent: #6b4a2e;
 }
 
 /* ===== Buttons ===== */
@@ -238,8 +283,8 @@ body {
 }
 
 .btn-primary:hover {
-  background: #6a4bab;
-  border-color: #6a4bab;
+  background: #4a7aab;
+  border-color: #4a7aab;
 }
 
 .btn-success {
@@ -456,7 +501,7 @@ select.input {
   color: #fff;
 }
 
-.source-badge.source-scryfall { background: #6e5494; }
+.source-badge.source-scryfall { background: #4a7a9e; }
 .source-badge.source-edhrec { background: #1c6ea4; }
 .source-badge.source-spellbook { background: #c0392b; }
 
