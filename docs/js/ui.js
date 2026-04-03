@@ -1089,9 +1089,9 @@ function updateRecommendationsDisplay(el, state) {
           ${metaInfo}
         </div>
         <div class="action-buttons">
-          <button class="btn btn-sm btn-success" data-action="add" data-card="${escapeAttr(rec.name)}">Add</button>
+          <button class="btn btn-sm" data-action="skip" data-card="${escapeAttr(rec.name)}">Dismiss</button>
           <button class="btn btn-sm btn-warning" data-action="consider" data-card="${escapeAttr(rec.name)}">Consider</button>
-          <button class="btn btn-sm" data-action="skip" data-card="${escapeAttr(rec.name)}">Skip</button>
+          <button class="btn btn-sm btn-success" data-action="add" data-card="${escapeAttr(rec.name)}">Add</button>
         </div>
       </div>`;
   }).join('');
