@@ -1376,18 +1376,29 @@ select.input {
 
 /* ===== Mobile Two-Column Stacks ===== */
 @media (max-width: 767px) {
+  .section-content {
+    padding: 8px;
+  }
+
   #deck-cards.mobile-two-col,
   #considering-cards.mobile-two-col,
   #dismissed-cards.mobile-two-col {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 4px;
   }
 
   #deck-cards.mobile-two-col .card-stack,
   #considering-cards.mobile-two-col .card-stack,
   #dismissed-cards.mobile-two-col .card-stack {
-    width: calc(50% - 4px);
+    width: calc(50% - 2px);
+    margin-bottom: 6px;
+  }
+
+  #deck-cards.mobile-two-col .card-stack-header,
+  #considering-cards.mobile-two-col .card-stack-header,
+  #dismissed-cards.mobile-two-col .card-stack-header {
+    padding: 4px 0;
   }
 }
 
