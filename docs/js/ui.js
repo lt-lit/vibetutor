@@ -1087,11 +1087,11 @@ function updateRecommendationsDisplay(el, state) {
           </div>
           <p class="rec-pitch">${escapeHtml(rec.pitch || '')}</p>
           ${metaInfo}
-          <div class="action-buttons">
-            <button class="btn btn-sm btn-success" data-action="add" data-card="${escapeAttr(rec.name)}">Add</button>
-            <button class="btn btn-sm btn-warning" data-action="consider" data-card="${escapeAttr(rec.name)}">Consider</button>
-            <button class="btn btn-sm" data-action="skip" data-card="${escapeAttr(rec.name)}">Skip</button>
-          </div>
+        </div>
+        <div class="action-buttons">
+          <button class="btn btn-sm btn-success" data-action="add" data-card="${escapeAttr(rec.name)}">Add</button>
+          <button class="btn btn-sm btn-warning" data-action="consider" data-card="${escapeAttr(rec.name)}">Consider</button>
+          <button class="btn btn-sm" data-action="skip" data-card="${escapeAttr(rec.name)}">Skip</button>
         </div>
       </div>`;
   }).join('');
@@ -1202,11 +1202,11 @@ function updateCutsDisplay(el, state) {
         <div class="rec-card-info">
           <p class="rec-pitch">${escapeHtml(cut.reason || '')}</p>
           ${metaInfo}
-          <div class="action-buttons">
-            <button class="btn btn-sm btn-danger" data-action="cut" data-card="${escapeAttr(cut.name)}">Cut</button>
-            <button class="btn btn-sm btn-warning" data-action="consider" data-card="${escapeAttr(cut.name)}">Consider</button>
-            <button class="btn btn-sm" data-action="keep" data-card="${escapeAttr(cut.name)}">Keep</button>
-          </div>
+        </div>
+        <div class="action-buttons">
+          <button class="btn btn-sm btn-danger" data-action="cut" data-card="${escapeAttr(cut.name)}">Cut</button>
+          <button class="btn btn-sm btn-warning" data-action="consider" data-card="${escapeAttr(cut.name)}">Consider</button>
+          <button class="btn btn-sm" data-action="keep" data-card="${escapeAttr(cut.name)}">Keep</button>
         </div>
       </div>`;
   }).join('');
