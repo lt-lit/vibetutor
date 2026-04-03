@@ -341,9 +341,11 @@ function buildDeckPanel(el, state, handlers) {
     el.querySelectorAll('#deck-view-toggle button').forEach(b =>
       b.classList.toggle('active', b.dataset.view === deckViewMode));
     updateDeckDisplay(el, _deckState);
-    // Also update considering panel with same view mode
+    // Also update considering and dismissed panels with same view mode
     const consideringEl = document.getElementById('considering-panel');
     if (consideringEl && _consideringState) updateConsideringDisplay(consideringEl, _consideringState);
+    const dismissedEl = document.getElementById('dismissed-panel');
+    if (dismissedEl && _dismissedState) updateDismissedDisplay(dismissedEl, _dismissedState);
   });
 
   // --- Grouping toggle ---
@@ -356,10 +358,13 @@ function buildDeckPanel(el, state, handlers) {
       b.classList.toggle('active', b.dataset.group === deckGrouping));
     collapsedGroups.clear();
     consideringCollapsedGroups.clear();
+    dismissedCollapsedGroups.clear();
     updateDeckDisplay(el, _deckState);
-    // Also update considering panel with same grouping
+    // Also update considering and dismissed panels with same grouping
     const consideringEl = document.getElementById('considering-panel');
     if (consideringEl && _consideringState) updateConsideringDisplay(consideringEl, _consideringState);
+    const dismissedEl = document.getElementById('dismissed-panel');
+    if (dismissedEl && _dismissedState) updateDismissedDisplay(dismissedEl, _dismissedState);
   });
 
   // --- Sorting toggle ---
@@ -373,6 +378,8 @@ function buildDeckPanel(el, state, handlers) {
     updateDeckDisplay(el, _deckState);
     const consideringEl = document.getElementById('considering-panel');
     if (consideringEl && _consideringState) updateConsideringDisplay(consideringEl, _consideringState);
+    const dismissedEl = document.getElementById('dismissed-panel');
+    if (dismissedEl && _dismissedState) updateDismissedDisplay(dismissedEl, _dismissedState);
   });
 
   // --- Import ---
@@ -407,9 +414,11 @@ function buildDeckPanel(el, state, handlers) {
       b.classList.toggle('active', b.dataset.cols === btn.dataset.cols));
     const cardsEl = el.querySelector('#deck-cards');
     cardsEl.classList.toggle('mobile-two-col', mobileDoubleColumn);
-    // Also update considering panel
+    // Also update considering and dismissed panels
     const consideringEl = document.getElementById('considering-panel');
     if (consideringEl && _consideringState) updateConsideringDisplay(consideringEl, _consideringState);
+    const dismissedEl = document.getElementById('dismissed-panel');
+    if (dismissedEl && _dismissedState) updateDismissedDisplay(dismissedEl, _dismissedState);
   });
 
   // --- Event delegation on cards container ---
