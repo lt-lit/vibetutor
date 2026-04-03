@@ -132,7 +132,7 @@ body {
 
 /* ===== Section ===== */
 .section {
-  border-bottom: 1px solid var(--section-accent);
+  border-bottom: 1px solid var(--border-color);
 }
 
 .section-header {
@@ -1178,20 +1178,29 @@ select.input {
   overflow: hidden;
   background: var(--bg-card);
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
+  flex-direction: column;
 }
 
 .rec-card > .action-buttons {
-  width: 100%;
   padding: 0 12px 12px;
 }
 
 .rec-card .card-image {
   border-radius: 0;
-  width: 160px;
-  min-width: 160px;
+  width: 100%;
   cursor: pointer;
+}
+
+#recs-results.mobile-two-col,
+#cuts-results.mobile-two-col {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+#recs-results.mobile-two-col .rec-card,
+#cuts-results.mobile-two-col .rec-card {
+  margin-bottom: 0;
 }
 
 .rec-card-info {
@@ -1463,12 +1472,6 @@ select.input {
 
   .card-stack {
     width: 250px;
-  }
-
-  #recs-results {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
-    gap: 16px;
   }
 
   .sections-container {
