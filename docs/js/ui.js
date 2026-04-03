@@ -111,7 +111,6 @@ function updateMyDecksDisplay(el, state, decks) {
     const isActive = deck.deckId === state.deckId;
     const imgUrl = deck.commander?.imageUri || '';
     const cardCount = deck.cards?.length || 0;
-    const powerLevel = deck.strategy?.powerLevel || 'mid';
     const lastMod = deck.lastModified ? formatTimeAgo(deck.lastModified) : '';
 
     return `
@@ -119,7 +118,7 @@ function updateMyDecksDisplay(el, state, decks) {
         ${imgUrl ? `<img class="card-image" src="${imgUrl}" alt="${escapeAttr(deck.deckName || 'Commander')}" loading="lazy">` : '<div class="deck-tile-no-img"></div>'}
         <div class="deck-tile-info">
           <span class="deck-tile-name" data-deck="${escapeAttr(deck.deckId)}">${escapeHtml(deck.deckName || 'Untitled')}</span>
-          <span class="field-hint">${cardCount}/99 cards &middot; ${escapeHtml(powerLevel)}${lastMod ? ' &middot; ' + lastMod : ''}</span>
+          <span class="field-hint">${cardCount}/99 cards${lastMod ? ' &middot; ' + lastMod : ''}</span>
           ${isActive ? '<span class="tag-badge" style="background:var(--accent-success);color:#000;width:fit-content">Active</span>' : ''}
         </div>
         <div class="action-buttons">
