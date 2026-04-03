@@ -206,6 +206,7 @@ function buildQueryPrompt(deckState, userPrompt) {
     .join('\n');
   const existingTags = [...new Set(deckState.cards.map(c => c.tag).filter(Boolean))];
   const skipped = deckState.skippedRecommendations.map(c => c.name || c).join(', ') || 'None';
+  const considering = (deckState.considering || []).map(c => c.name || c).join(', ') || 'None';
 
   let instruction;
   if (userPrompt) {
@@ -224,7 +225,9 @@ Existing tags: ${existingTags.join(', ') || 'None'}
 Current deck (${deckState.cards.length}/99):
 ${cardSummary || 'Empty deck'}
 
-Skipped cards (do NOT suggest these): ${skipped}
+Cards under review (not yet added — these may hint at directions the user is exploring, but the committed deck list above is the primary signal for the deck's identity): ${considering}
+
+Cards previously suggested and passed on (do NOT re-suggest these, but don't assume the user rejects the entire category — they may have passed for budget, preference, or redundancy reasons): ${skipped}
 
 ${instruction}
 
@@ -243,6 +246,8 @@ function buildSelectionPrompt(deckState, userPrompt, pool) {
   const commander = deckState.commander;
   const existingTags = [...new Set(deckState.cards.map(c => c.tag).filter(Boolean))];
   const deckNames = deckState.cards.map(c => c.name).join(', ');
+  const considering = (deckState.considering || []).map(c => c.name || c).join(', ') || 'None';
+  const skipped = deckState.skippedRecommendations.map(c => c.name || c).join(', ') || 'None';
 
   const poolSummary = pool.map(c => {
     let info = `${c.name} — ${c.scryfallData?.typeLine || ''}, CMC ${c.scryfallData?.cmc ?? '?'}`;
@@ -260,6 +265,8 @@ Power level: ${deckState.strategy?.powerLevel || 'mid'}
 Budget cap: ${deckState.strategy?.budgetCap ? '$' + deckState.strategy.budgetCap : 'None'}
 Current deck: ${deckNames}
 Existing tags in deck: ${existingTags.join(', ') || 'None'}
+Cards under review (not yet added — these may hint at directions the user is exploring, but the committed deck list above is the primary signal for the deck's identity): ${considering}
+Cards previously suggested and passed on (don't assume the user rejects the entire category — they may have passed for budget, preference, or redundancy reasons): ${skipped}
 ${userPrompt ? `User is looking for: "${userPrompt}"` : 'User wants general recommendations for what the deck needs most.'}
 
 CANDIDATE POOL (pick ONLY from these cards):
@@ -384,10 +391,11 @@ function mergeCardPool(scryfallCards, edhrecCards, spellbookCards, deckState) {
   const merged = new Map();
   const deckNames = new Set(deckState.cards.map(c => c.name));
   const skippedNames = new Set((deckState.skippedRecommendations || []).map(c => c.name || c));
+  const consideringNames = new Set((deckState.considering || []).map(c => c.name || c));
 
   // Process in order: scryfall first (has full data), then enrich with edhrec/spellbook
   for (const card of [...scryfallCards, ...edhrecCards, ...spellbookCards]) {
-    if (deckNames.has(card.name) || skippedNames.has(card.name)) continue;
+    if (deckNames.has(card.name) || skippedNames.has(card.name) || consideringNames.has(card.name)) continue;
 
     if (merged.has(card.name)) {
       const existing = merged.get(card.name);
