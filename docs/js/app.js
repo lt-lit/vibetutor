@@ -748,23 +748,21 @@ function renderActual(scrollToRestore) {
   updateBadge('dismissed', state.skippedRecommendations.length > 0 ? `${state.skippedRecommendations.length}` : '');
   updateBadge('recommendations', state.recommendationsResults.length > 0 ? `${state.recommendationsResults.length}` : '');
   updateBadge('cuts', state.cutsResults.length > 0 ? `${state.cutsResults.length}` : '');
-  if (state.commander) updateSummary('strategy', state.commander.name);
   if (state.cards.length > 0) updateSummary('deck', `${state.cards.length}/99 cards`);
   ui.updateSettingsMenu(state);
 
   // Selective panel rendering — only rebuild panels whose data changed
   const needsMyDecks = fullRender || dirty.has('_decksLibrary') || dirty.has('deckId') || dirty.has('deckName');
-  const needsStrategy = fullRender || dirty.has('commander') || dirty.has('strategy') || dirty.has('edhrecData');
   const needsDeck = fullRender || dirty.has('cards') || dirty.has('commander') || dirty.has('strategy');
   const needsConsidering = fullRender || dirty.has('considering');
   const needsDismissed = fullRender || dirty.has('skippedRecommendations');
   const needsRecs = fullRender || dirty.has('recommendationsResults') || dirty.has('_recsLoading')
-    || dirty.has('_recsError') || dirty.has('_recsLoadingStatus') || dirty.has('recentPrompts');
+    || dirty.has('_recsError') || dirty.has('_recsLoadingStatus') || dirty.has('recentPrompts')
+    || dirty.has('strategy');
   const needsCuts = fullRender || dirty.has('cutsResults') || dirty.has('_cutsLoading') || dirty.has('_cutsError');
   const needsStats = fullRender || dirty.has('cards') || dirty.has('combos');
 
   if (needsMyDecks) ui.renderMyDecksPanel(state, decks, handlers);
-  if (needsStrategy) ui.renderStrategyPanel(state, handlers);
   if (needsDeck) ui.renderDeckPanel(state, handlers);
   if (needsConsidering) ui.renderConsideringPanel(state, handlers);
   if (needsDismissed) ui.renderDismissedPanel(state, handlers);

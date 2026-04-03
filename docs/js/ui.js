@@ -148,99 +148,6 @@ function formatTimeAgo(timestamp) {
 // STRATEGY PANEL
 // ============================================================
 
-/**
- * Render the Strategy panel.
- * First call builds the DOM; subsequent calls update dynamic elements.
- */
-export function renderStrategyPanel(state, handlers) {
-  const el = document.getElementById('strategy-panel');
-  if (!el) return;
-
-  if (!initialized.has('strategy')) {
-    initialized.add('strategy');
-    buildStrategyPanel(el, state, handlers);
-  }
-
-  // Update dynamic elements
-  updateStrategyDisplay(el, state);
-}
-
-function buildStrategyPanel(el, state, handlers) {
-  el.innerHTML = `
-    <div class="strategy-content">
-      <div class="strategy-fields">
-        <div class="field-group">
-          <label class="field-label" for="strategy-notes">Strategy / Vibe</label>
-          <textarea id="strategy-notes" class="input" rows="3"
-                    placeholder="e.g., Political chaos, donate bad permanents, pillowfort"></textarea>
-        </div>
-
-        <div class="field-group">
-          <label class="field-label">Power Level</label>
-          <div class="segmented-control" id="power-level-control">
-            <button data-level="casual">Casual</button>
-            <button data-level="mid">Mid</button>
-            <button data-level="high">High</button>
-            <button data-level="cedh">cEDH</button>
-          </div>
-        </div>
-
-        <div class="field-group">
-          <label class="field-label" for="budget-cap">Budget Cap ($ per card, optional)</label>
-          <input type="number" id="budget-cap" class="input" min="0" step="0.5"
-                 placeholder="No limit">
-        </div>
-      </div>
-    </div>
-  `;
-
-  // Strategy notes
-  el.querySelector('#strategy-notes').addEventListener('input', debounce((e) => {
-    if (handlers.onStrategyUpdate) {
-      handlers.onStrategyUpdate({ notes: e.target.value });
-    }
-  }, 500));
-
-  // Power level
-  el.querySelector('#power-level-control').addEventListener('click', (e) => {
-    const btn = e.target.closest('button[data-level]');
-    if (!btn) return;
-    if (handlers.onStrategyUpdate) {
-      handlers.onStrategyUpdate({ powerLevel: btn.dataset.level });
-    }
-  });
-
-  // Budget cap
-  el.querySelector('#budget-cap').addEventListener('input', debounce((e) => {
-    const val = e.target.value ? parseFloat(e.target.value) : null;
-    if (handlers.onStrategyUpdate) {
-      handlers.onStrategyUpdate({ budgetCap: val });
-    }
-  }, 500));
-
-}
-
-function updateStrategyDisplay(el, state) {
-  // Update strategy fields (only if not focused to avoid clobbering user input)
-  const notesEl = el.querySelector('#strategy-notes');
-  if (notesEl && document.activeElement !== notesEl) {
-    notesEl.value = state.strategy.notes || '';
-  }
-
-  // Update power level buttons
-  const powerBtns = el.querySelectorAll('#power-level-control button');
-  powerBtns.forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.level === state.strategy.powerLevel);
-  });
-
-  // Update budget cap (only if not focused)
-  const budgetEl = el.querySelector('#budget-cap');
-  if (budgetEl && document.activeElement !== budgetEl) {
-    budgetEl.value = state.strategy.budgetCap ?? '';
-  }
-
-}
-
 // ============================================================
 // SETTINGS MENU (gear icon dropdown)
 // ============================================================
@@ -357,8 +264,15 @@ function buildDeckPanel(el, state, handlers) {
           <div id="deck-commander-dropdown" class="dropdown" hidden></div>
         </div>
         <div id="deck-commander-selected" hidden>
-          <img id="deck-commander-image" class="commander-image card-image" src="" alt="">
-          <button id="deck-commander-change" class="btn btn-sm mt-sm">Change Commander</button>
+          <div class="commander-with-strategy">
+            <img id="deck-commander-image" class="commander-image card-image" src="" alt="">
+            <div class="commander-strategy-area">
+              <label class="field-label" for="strategy-notes">Strategy / Vibe</label>
+              <textarea id="strategy-notes" class="input" rows="5"
+                        placeholder="e.g., Political chaos, donate bad permanents, pillowfort"></textarea>
+              <button id="deck-commander-change" class="btn btn-sm mt-sm">Change Commander</button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -430,6 +344,13 @@ function buildDeckPanel(el, state, handlers) {
   el.querySelector('#deck-commander-change').addEventListener('click', () => {
     if (handlers.onCommanderChange) handlers.onCommanderChange();
   });
+
+  // Strategy notes (next to commander image)
+  el.querySelector('#strategy-notes').addEventListener('input', debounce((e) => {
+    if (handlers.onStrategyUpdate) {
+      handlers.onStrategyUpdate({ notes: e.target.value });
+    }
+  }, 500));
 
   // --- Card search autocomplete ---
   const searchInput = el.querySelector('#deck-search');
@@ -612,6 +533,12 @@ function updateDeckDisplay(el, state) {
       cmdSearch.hidden = false;
       cmdSelected.hidden = true;
     }
+  }
+
+  // Update strategy notes (only if not focused to avoid clobbering user input)
+  const notesEl = el.querySelector('#strategy-notes');
+  if (notesEl && document.activeElement !== notesEl) {
+    notesEl.value = state.strategy?.notes || '';
   }
 
   // Update cards display
@@ -1089,6 +1016,23 @@ export function renderRecommendationsPanel(state, handlers) {
 function buildRecommendationsPanel(el, state, handlers) {
   el.innerHTML = `
     <div class="recs-content">
+      <div class="recs-settings">
+        <div class="flex gap-md" style="flex-wrap:wrap">
+          <div class="field-group" style="flex:1;min-width:200px">
+            <label class="field-label">Power Level</label>
+            <div class="segmented-control" id="power-level-control">
+              <button data-level="casual">Casual</button>
+              <button data-level="mid">Mid</button>
+              <button data-level="high">High</button>
+              <button data-level="cedh">cEDH</button>
+            </div>
+          </div>
+          <div class="field-group">
+            <label class="field-label" for="budget-cap">Budget Cap ($/card)</label>
+            <input type="number" id="budget-cap" class="input" min="0" step="0.5" placeholder="No limit">
+          </div>
+        </div>
+      </div>
       <div class="recs-input-area">
         <div class="flex gap-sm">
           <input type="text" id="recs-prompt" class="input" style="flex:1"
@@ -1102,6 +1046,23 @@ function buildRecommendationsPanel(el, state, handlers) {
       <div id="recs-results"></div>
     </div>
   `;
+
+  // Power level
+  el.querySelector('#power-level-control').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-level]');
+    if (!btn) return;
+    if (handlers.onStrategyUpdate) {
+      handlers.onStrategyUpdate({ powerLevel: btn.dataset.level });
+    }
+  });
+
+  // Budget cap
+  el.querySelector('#budget-cap').addEventListener('input', debounce((e) => {
+    const val = e.target.value ? parseFloat(e.target.value) : null;
+    if (handlers.onStrategyUpdate) {
+      handlers.onStrategyUpdate({ budgetCap: val });
+    }
+  }, 500));
 
   // Suggest button
   el.querySelector('#recs-suggest-btn').addEventListener('click', () => {
@@ -1146,6 +1107,18 @@ function buildRecommendationsPanel(el, state, handlers) {
 }
 
 function updateRecommendationsDisplay(el, state) {
+  // Update power level buttons
+  const powerBtns = el.querySelectorAll('#power-level-control button');
+  powerBtns.forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.level === state.strategy?.powerLevel);
+  });
+
+  // Update budget cap (only if not focused)
+  const budgetEl = el.querySelector('#budget-cap');
+  if (budgetEl && document.activeElement !== budgetEl) {
+    budgetEl.value = state.strategy?.budgetCap ?? '';
+  }
+
   // Recent prompts
   const recentEl = el.querySelector('#recs-recent-prompts');
   if (recentEl && state.recentPrompts.length > 0) {

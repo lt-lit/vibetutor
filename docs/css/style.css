@@ -629,32 +629,7 @@ select.input {
   background: var(--bg-hover);
 }
 
-/* ===== Strategy Panel ===== */
-.strategy-content {
-  max-width: 480px;
-}
-
-.strategy-commander {
-  margin-bottom: 16px;
-}
-
-.commander-display {
-  text-align: center;
-}
-
-.commander-image {
-  max-width: 300px;
-  margin: 0 auto;
-  display: block;
-}
-
-.strategy-fields {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  margin-top: 16px;
-}
-
+/* ===== Shared Form Styles ===== */
 .field-group {
   display: flex;
   flex-direction: column;
@@ -738,11 +713,27 @@ select.input {
   max-width: 200px;
   border-radius: 4.75% / 3.5%;
   display: block;
-  margin: 0 auto;
 }
 
-#deck-commander-selected {
-  text-align: center;
+.commander-with-strategy {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.commander-strategy-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+@media (max-width: 600px) {
+  .commander-with-strategy {
+    flex-direction: column;
+    max-width: 200px;
+    margin: 0 auto;
+  }
 }
 
 .deck-toolbar {
@@ -1154,6 +1145,10 @@ select.input {
   padding: 6px 10px;
   border-radius: var(--border-radius-sm);
   border-left: 3px solid var(--accent-warning);
+}
+
+.recs-settings {
+  margin-bottom: 16px;
 }
 
 .recs-input-area {
