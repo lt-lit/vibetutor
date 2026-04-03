@@ -1201,6 +1201,19 @@ select.input {
 #recs-results.mobile-two-col .rec-card,
 #cuts-results.mobile-two-col .rec-card {
   margin-bottom: 0;
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+#recs-results.mobile-two-col .rec-card .card-image,
+#cuts-results.mobile-two-col .rec-card .card-image {
+  width: 140px;
+  min-width: 140px;
+}
+
+#recs-results.mobile-two-col .rec-card > .action-buttons,
+#cuts-results.mobile-two-col .rec-card > .action-buttons {
+  width: 100%;
 }
 
 .rec-card-info {
