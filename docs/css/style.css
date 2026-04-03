@@ -175,7 +175,7 @@ body {
 
 .section-badge {
   font-size: 0.75rem;
-  color: var(--text-secondary);
+  color: var(--section-name-color);
   background: var(--section-accent);
   padding: 2px 8px;
   border-radius: 10px;
@@ -203,6 +203,7 @@ body {
   padding: 16px;
   background: var(--section-content-bg);
   border-left: 3px solid var(--section-accent);
+  border-right: 3px solid var(--section-accent);
 }
 
 .section.collapsed .section-content {
@@ -213,43 +214,33 @@ body {
 [data-section="mydecks"],
 [data-section="deck"],
 [data-section="stats"] {
-  --section-header-bg: #1e2235;
-  --section-header-hover: #252a40;
   --section-content-bg: #1a1a2e;
-  --section-accent: #3a3f55;
-  --section-name-color: #8890a8;
+  --section-accent: #3a4060;
+  --section-name-color: #9aa0bc;
 }
 
 [data-section="considering"] {
-  --section-header-bg: #2a2518;
-  --section-header-hover: #352e20;
   --section-content-bg: #1a1a2e;
-  --section-accent: #6b5a2e;
-  --section-name-color: #c9a84c;
+  --section-accent: #9a8230;
+  --section-name-color: #e8c840;
 }
 
 [data-section="dismissed"] {
-  --section-header-bg: #2a1a1e;
-  --section-header-hover: #352025;
   --section-content-bg: #1a1a2e;
-  --section-accent: #6b2e38;
-  --section-name-color: #c94c5a;
+  --section-accent: #a03545;
+  --section-name-color: #e85565;
 }
 
 [data-section="recommendations"] {
-  --section-header-bg: #1a2a1e;
-  --section-header-hover: #203528;
   --section-content-bg: #1a1a2e;
-  --section-accent: #2e6b3a;
-  --section-name-color: #4caf6a;
+  --section-accent: #38984a;
+  --section-name-color: #50d068;
 }
 
 [data-section="cuts"] {
-  --section-header-bg: #2a2018;
-  --section-header-hover: #352a20;
   --section-content-bg: #1a1a2e;
-  --section-accent: #6b4a2e;
-  --section-name-color: #c98a4c;
+  --section-accent: #a06830;
+  --section-name-color: #e89848;
 }
 
 /* ===== Buttons ===== */
