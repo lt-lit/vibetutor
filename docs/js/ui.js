@@ -1657,9 +1657,27 @@ export function renderStatsPanel(state) {
   const combosHtml = renderCombosSection(state);
 
   // --- Bracket ---
-  const bracketHtml = state.combos?.bracket != null
-    ? `<div class="stat-bracket">Bracket: <strong>${state.combos.bracket}</strong></div>`
-    : '';
+  const BRACKET_INFO = {
+    'E': { num: 1, name: 'Exhibition', desc: 'Casual/janky combos' },
+    'O': { num: 2, name: 'Oddball', desc: 'Could be powerful but may need a third card' },
+    'C': { num: 2, name: 'Core', desc: 'Fast two-card combos or extra turn effects' },
+    'S': { num: 3, name: 'Spicy', desc: 'Hard-to-classify, could be ruthless' },
+    'P': { num: 3, name: 'Powerful', desc: 'Game changers or relevant two-card combos' },
+    'R': { num: 4, name: 'Ruthless', desc: 'Competitive — fast combos or infinite results' },
+    'B': { num: null, name: 'Banned', desc: 'Contains banned combo elements' },
+  };
+  let bracketHtml = '';
+  if (state.combos?.bracket != null) {
+    const raw = String(state.combos.bracket).toUpperCase();
+    const info = BRACKET_INFO[raw];
+    if (info && info.num != null) {
+      bracketHtml = `<div class="stat-value">Bracket ${info.num}</div><div class="stat-label">${info.name}</div><div class="field-hint">${info.desc}</div>`;
+    } else if (info) {
+      bracketHtml = `<div class="stat-value">${info.name}</div><div class="field-hint">${info.desc}</div>`;
+    } else {
+      bracketHtml = `<div class="stat-value">Bracket ${raw}</div><div class="stat-label">Power Level</div>`;
+    }
+  }
 
   el.innerHTML = `
     <div class="stats-content">
