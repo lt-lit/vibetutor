@@ -496,10 +496,12 @@ select.input {
   display: flex;
   gap: 8px;
   margin-top: 8px;
+  flex-wrap: wrap;
 }
 
 .action-buttons .btn {
   flex: 1;
+  min-width: 0;
 }
 
 /* ===== Dropdown ===== */
