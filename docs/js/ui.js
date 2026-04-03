@@ -111,7 +111,6 @@ function updateMyDecksDisplay(el, state, decks) {
     const isActive = deck.deckId === state.deckId;
     const imgUrl = deck.commander?.imageUri || '';
     const cardCount = deck.cards?.length || 0;
-    const powerLevel = deck.strategy?.powerLevel || 'mid';
     const lastMod = deck.lastModified ? formatTimeAgo(deck.lastModified) : '';
 
     return `
@@ -119,7 +118,7 @@ function updateMyDecksDisplay(el, state, decks) {
         ${imgUrl ? `<img class="card-image" src="${imgUrl}" alt="${escapeAttr(deck.deckName || 'Commander')}" loading="lazy">` : '<div class="deck-tile-no-img"></div>'}
         <div class="deck-tile-info">
           <span class="deck-tile-name" data-deck="${escapeAttr(deck.deckId)}">${escapeHtml(deck.deckName || 'Untitled')}</span>
-          <span class="field-hint">${cardCount}/99 cards &middot; ${escapeHtml(powerLevel)}${lastMod ? ' &middot; ' + lastMod : ''}</span>
+          <span class="field-hint">${cardCount}/99 cards${lastMod ? ' &middot; ' + lastMod : ''}</span>
           ${isActive ? '<span class="tag-badge" style="background:var(--accent-success);color:#000;width:fit-content">Active</span>' : ''}
         </div>
         <div class="action-buttons">
@@ -147,99 +146,6 @@ function formatTimeAgo(timestamp) {
 // ============================================================
 // STRATEGY PANEL
 // ============================================================
-
-/**
- * Render the Strategy panel.
- * First call builds the DOM; subsequent calls update dynamic elements.
- */
-export function renderStrategyPanel(state, handlers) {
-  const el = document.getElementById('strategy-panel');
-  if (!el) return;
-
-  if (!initialized.has('strategy')) {
-    initialized.add('strategy');
-    buildStrategyPanel(el, state, handlers);
-  }
-
-  // Update dynamic elements
-  updateStrategyDisplay(el, state);
-}
-
-function buildStrategyPanel(el, state, handlers) {
-  el.innerHTML = `
-    <div class="strategy-content">
-      <div class="strategy-fields">
-        <div class="field-group">
-          <label class="field-label" for="strategy-notes">Strategy / Vibe</label>
-          <textarea id="strategy-notes" class="input" rows="3"
-                    placeholder="e.g., Political chaos, donate bad permanents, pillowfort"></textarea>
-        </div>
-
-        <div class="field-group">
-          <label class="field-label">Power Level</label>
-          <div class="segmented-control" id="power-level-control">
-            <button data-level="casual">Casual</button>
-            <button data-level="mid">Mid</button>
-            <button data-level="high">High</button>
-            <button data-level="cedh">cEDH</button>
-          </div>
-        </div>
-
-        <div class="field-group">
-          <label class="field-label" for="budget-cap">Budget Cap ($ per card, optional)</label>
-          <input type="number" id="budget-cap" class="input" min="0" step="0.5"
-                 placeholder="No limit">
-        </div>
-      </div>
-    </div>
-  `;
-
-  // Strategy notes
-  el.querySelector('#strategy-notes').addEventListener('input', debounce((e) => {
-    if (handlers.onStrategyUpdate) {
-      handlers.onStrategyUpdate({ notes: e.target.value });
-    }
-  }, 500));
-
-  // Power level
-  el.querySelector('#power-level-control').addEventListener('click', (e) => {
-    const btn = e.target.closest('button[data-level]');
-    if (!btn) return;
-    if (handlers.onStrategyUpdate) {
-      handlers.onStrategyUpdate({ powerLevel: btn.dataset.level });
-    }
-  });
-
-  // Budget cap
-  el.querySelector('#budget-cap').addEventListener('input', debounce((e) => {
-    const val = e.target.value ? parseFloat(e.target.value) : null;
-    if (handlers.onStrategyUpdate) {
-      handlers.onStrategyUpdate({ budgetCap: val });
-    }
-  }, 500));
-
-}
-
-function updateStrategyDisplay(el, state) {
-  // Update strategy fields (only if not focused to avoid clobbering user input)
-  const notesEl = el.querySelector('#strategy-notes');
-  if (notesEl && document.activeElement !== notesEl) {
-    notesEl.value = state.strategy.notes || '';
-  }
-
-  // Update power level buttons
-  const powerBtns = el.querySelectorAll('#power-level-control button');
-  powerBtns.forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.level === state.strategy.powerLevel);
-  });
-
-  // Update budget cap (only if not focused)
-  const budgetEl = el.querySelector('#budget-cap');
-  if (budgetEl && document.activeElement !== budgetEl) {
-    budgetEl.value = state.strategy.budgetCap ?? '';
-  }
-
-}
 
 // ============================================================
 // SETTINGS MENU (gear icon dropdown)
@@ -357,8 +263,17 @@ function buildDeckPanel(el, state, handlers) {
           <div id="deck-commander-dropdown" class="dropdown" hidden></div>
         </div>
         <div id="deck-commander-selected" hidden>
-          <img id="deck-commander-image" class="commander-image card-image" src="" alt="">
-          <button id="deck-commander-change" class="btn btn-sm mt-sm">Change Commander</button>
+          <div class="commander-with-strategy">
+            <div class="commander-image-col">
+              <img id="deck-commander-image" class="commander-image card-image" src="" alt="">
+              <button id="deck-commander-change" class="btn btn-sm mt-sm" style="width:100%">Change Commander</button>
+            </div>
+            <div class="commander-strategy-area">
+              <label class="field-label" for="strategy-notes">Strategy / Vibe</label>
+              <textarea id="strategy-notes" class="input"
+                        placeholder="e.g., Political chaos, donate bad permanents, pillowfort"></textarea>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -430,6 +345,19 @@ function buildDeckPanel(el, state, handlers) {
   el.querySelector('#deck-commander-change').addEventListener('click', () => {
     if (handlers.onCommanderChange) handlers.onCommanderChange();
   });
+
+  // Commander image click — zoom overlay
+  el.querySelector('#deck-commander-image').addEventListener('click', () => {
+    const img = el.querySelector('#deck-commander-image');
+    if (img && img.src) showCardOverlay(img.src, img.alt);
+  });
+
+  // Strategy notes (next to commander image)
+  el.querySelector('#strategy-notes').addEventListener('input', debounce((e) => {
+    if (handlers.onStrategyUpdate) {
+      handlers.onStrategyUpdate({ notes: e.target.value });
+    }
+  }, 500));
 
   // --- Card search autocomplete ---
   const searchInput = el.querySelector('#deck-search');
@@ -540,6 +468,8 @@ function buildDeckPanel(el, state, handlers) {
       b.classList.toggle('active', b.dataset.cols === btn.dataset.cols));
     const cardsEl = el.querySelector('#deck-cards');
     cardsEl.classList.toggle('mobile-two-col', mobileDoubleColumn);
+    const cmdArea = el.querySelector('.commander-with-strategy');
+    if (cmdArea) cmdArea.classList.toggle('two-col', mobileDoubleColumn);
     // Also update considering and dismissed panels
     const consideringEl = document.getElementById('considering-panel');
     if (consideringEl && _consideringState) updateConsideringDisplay(consideringEl, _consideringState);
@@ -613,6 +543,16 @@ function updateDeckDisplay(el, state) {
       cmdSelected.hidden = true;
     }
   }
+
+  // Update strategy notes (only if not focused to avoid clobbering user input)
+  const notesEl = el.querySelector('#strategy-notes');
+  if (notesEl && document.activeElement !== notesEl) {
+    notesEl.value = state.strategy?.notes || '';
+  }
+
+  // Sync commander layout with column toggle
+  const cmdArea = el.querySelector('.commander-with-strategy');
+  if (cmdArea) cmdArea.classList.toggle('two-col', mobileDoubleColumn);
 
   // Update cards display
   const cardsEl = el.querySelector('#deck-cards');
@@ -1099,9 +1039,43 @@ function buildRecommendationsPanel(el, state, handlers) {
         <p class="field-hint mt-sm" id="recs-hint">Try: removal, wheel effects, budget ramp under $2, the saltiest cards available</p>
         <div id="recs-recent-prompts" class="mt-sm"></div>
       </div>
+      <div class="recs-settings">
+        <div class="flex gap-md" style="flex-wrap:wrap;align-items:flex-end">
+          <div class="field-group" style="flex:1;min-width:200px">
+            <label class="field-label">Power Level</label>
+            <div class="segmented-control" id="power-level-control">
+              <button data-level="casual">Casual</button>
+              <button data-level="mid">Mid</button>
+              <button data-level="high">High</button>
+              <button data-level="cedh">cEDH</button>
+            </div>
+          </div>
+          <div class="field-group" style="flex-direction:row;align-items:center;gap:8px">
+            <label class="field-label" for="budget-cap" style="white-space:nowrap;margin:0">Budget Cap ($/card)</label>
+            <input type="number" id="budget-cap" class="input" min="0" step="0.5" placeholder="No limit" style="width:100px">
+          </div>
+        </div>
+      </div>
       <div id="recs-results"></div>
     </div>
   `;
+
+  // Power level
+  el.querySelector('#power-level-control').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-level]');
+    if (!btn) return;
+    if (handlers.onStrategyUpdate) {
+      handlers.onStrategyUpdate({ powerLevel: btn.dataset.level });
+    }
+  });
+
+  // Budget cap
+  el.querySelector('#budget-cap').addEventListener('input', debounce((e) => {
+    const val = e.target.value ? parseFloat(e.target.value) : null;
+    if (handlers.onStrategyUpdate) {
+      handlers.onStrategyUpdate({ budgetCap: val });
+    }
+  }, 500));
 
   // Suggest button
   el.querySelector('#recs-suggest-btn').addEventListener('click', () => {
@@ -1146,6 +1120,18 @@ function buildRecommendationsPanel(el, state, handlers) {
 }
 
 function updateRecommendationsDisplay(el, state) {
+  // Update power level buttons
+  const powerBtns = el.querySelectorAll('#power-level-control button');
+  powerBtns.forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.level === state.strategy?.powerLevel);
+  });
+
+  // Update budget cap (only if not focused)
+  const budgetEl = el.querySelector('#budget-cap');
+  if (budgetEl && document.activeElement !== budgetEl) {
+    budgetEl.value = state.strategy?.budgetCap ?? '';
+  }
+
   // Recent prompts
   const recentEl = el.querySelector('#recs-recent-prompts');
   if (recentEl && state.recentPrompts.length > 0) {
@@ -1163,9 +1149,7 @@ function updateRecommendationsDisplay(el, state) {
     suggestBtn.textContent = 'Searching...';
     resultsEl.innerHTML = `
       <div class="loading-status">${escapeHtml(state._recsLoadingStatus || 'Analyzing deck...')}</div>
-      <div class="skeleton skeleton-card"></div>
-      <div class="skeleton skeleton-card"></div>
-      <div class="skeleton skeleton-card"></div>
+      <div class="recs-loading-spinner"></div>
     `;
     return;
   }
@@ -1192,7 +1176,6 @@ function updateRecommendationsDisplay(el, state) {
     }).join('');
 
     let metaInfo = '';
-    if (rec.edhrecSynergy != null) metaInfo += `<span class="field-hint">Synergy: ${(rec.edhrecSynergy * 100).toFixed(0)}%</span> `;
     if (rec.combosUnlocked?.length > 0) {
       metaInfo += `<div class="combo-alert">Completes combo with: ${rec.combosUnlocked.join(', ')}</div>`;
     }
@@ -1674,9 +1657,27 @@ export function renderStatsPanel(state) {
   const combosHtml = renderCombosSection(state);
 
   // --- Bracket ---
-  const bracketHtml = state.combos?.bracket != null
-    ? `<div class="stat-bracket">Bracket: <strong>${state.combos.bracket}</strong></div>`
-    : '';
+  const BRACKET_INFO = {
+    'E': { num: 1, name: 'Exhibition', desc: 'Casual/janky combos' },
+    'O': { num: 2, name: 'Oddball', desc: 'Could be powerful but may need a third card' },
+    'C': { num: 2, name: 'Core', desc: 'Fast two-card combos or extra turn effects' },
+    'S': { num: 3, name: 'Spicy', desc: 'Hard-to-classify, could be ruthless' },
+    'P': { num: 3, name: 'Powerful', desc: 'Game changers or relevant two-card combos' },
+    'R': { num: 4, name: 'Ruthless', desc: 'Competitive — fast combos or infinite results' },
+    'B': { num: null, name: 'Banned', desc: 'Contains banned combo elements' },
+  };
+  let bracketHtml = '';
+  if (state.combos?.bracket != null) {
+    const raw = String(state.combos.bracket).toUpperCase();
+    const info = BRACKET_INFO[raw];
+    if (info && info.num != null) {
+      bracketHtml = `<div class="stat-value">Bracket ${info.num}</div><div class="stat-label">${info.name}</div><div class="field-hint">${info.desc}</div>`;
+    } else if (info) {
+      bracketHtml = `<div class="stat-value">${info.name}</div><div class="field-hint">${info.desc}</div>`;
+    } else {
+      bracketHtml = `<div class="stat-value">Bracket ${raw}</div><div class="stat-label">Power Level</div>`;
+    }
+  }
 
   el.innerHTML = `
     <div class="stats-content">

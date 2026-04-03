@@ -19,11 +19,10 @@ const SYSTEM_PROMPT = `You are VibeTutor, an expert MTG Commander/EDH deck build
 RULES:
 1. NEVER invent card names. ONLY pick from the candidate pool provided.
 2. Account for deck state: cards present, skipped, kept.
-3. Concise pitches: 1-2 sentences.
-4. Reference EDHREC data when available.
-5. Always mention combo completions from Spellbook data.
-6. If a budget cap is set, avoid cards above that price.
-7. When recommending cards, include a suggested tag. Reuse existing tags in the deck where appropriate. Tags should be contextual to the deck's strategy (e.g., "wheel", "gift", "defence" — not generic categories like "creature" or "instant").
+3. Pitches must be punchy, deck-specific elevator sells — explain what the card DOES for THIS deck's strategy. Never quote synergy percentages, inclusion rates, or other statistics in pitches — the UI already shows those. Focus on interactions, combos, and strategic fit.
+4. Always mention combo completions from Spellbook data.
+5. If a budget cap is set, avoid cards above that price.
+6. When recommending cards, include a suggested tag. Reuse existing tags in the deck where appropriate. Tags should be contextual to the deck's strategy (e.g., "wheel", "gift", "defence" — not generic categories like "creature" or "instant").
 
 Scryfall syntax (for query composition):
 ci:wur | t:creature | o:"phrase" | cmc<=3 | f:commander
@@ -198,14 +197,40 @@ Respond with JSON: {"type":"auto-tag","tags":[{"name":"Card Name","tag":"tagname
 // PROMPT BUILDERS
 // ============================================================
 
+function buildDeckContext(deckState) {
+  const cardSummary = deckState.cards
+    .map(c => `${c.name} (${c.scryfallData?.typeLine || ''}, CMC ${c.scryfallData?.cmc ?? '?'}) [${c.tag || 'untagged'}]`)
+    .join('\n');
+
+  // Tag distribution
+  const tagCounts = {};
+  for (const c of deckState.cards) {
+    const t = c.tag || 'untagged';
+    tagCounts[t] = (tagCounts[t] || 0) + 1;
+  }
+  const tagSummary = Object.entries(tagCounts).map(([t, n]) => `${t}: ${n}`).join(', ');
+
+  // Mana curve
+  const nonLands = deckState.cards.filter(c => !c.scryfallData?.typeLine?.toLowerCase().includes('land'));
+  const cmcBuckets = [0, 0, 0, 0, 0, 0, 0, 0]; // 0-7+
+  for (const c of nonLands) {
+    cmcBuckets[Math.min(7, Math.floor(c.scryfallData?.cmc ?? 0))]++;
+  }
+  const avgCmc = nonLands.length > 0
+    ? (nonLands.reduce((sum, c) => sum + (c.scryfallData?.cmc ?? 0), 0) / nonLands.length).toFixed(2)
+    : '0.00';
+
+  const existingTags = [...new Set(deckState.cards.map(c => c.tag).filter(Boolean))];
+  const skipped = deckState.skippedRecommendations.map(c => c.name || c).join(', ') || 'None';
+  const considering = (deckState.considering || []).map(c => c.name || c).join(', ') || 'None';
+
+  return { cardSummary, tagSummary, cmcBuckets, avgCmc, existingTags, skipped, considering };
+}
+
 function buildQueryPrompt(deckState, userPrompt) {
   const commander = deckState.commander;
   const ci = commander?.colorIdentity?.join('') || '';
-  const cardSummary = deckState.cards
-    .map(c => `${c.name} (${c.scryfallData?.typeLine || ''}, CMC ${c.scryfallData?.cmc ?? '?'})`)
-    .join('\n');
-  const existingTags = [...new Set(deckState.cards.map(c => c.tag).filter(Boolean))];
-  const skipped = deckState.skippedRecommendations.map(c => c.name || c).join(', ') || 'None';
+  const ctx = buildDeckContext(deckState);
 
   let instruction;
   if (userPrompt) {
@@ -219,12 +244,16 @@ Translate this into creative Scryfall queries. Approach the concept from multipl
 Power level: ${deckState.strategy?.powerLevel || 'mid'}
 Strategy notes: ${deckState.strategy?.notes || 'None'}
 Budget cap: ${deckState.strategy?.budgetCap ? '$' + deckState.strategy.budgetCap + ' per card' : 'None'}
-Existing tags: ${existingTags.join(', ') || 'None'}
+Existing tags: ${ctx.existingTags.join(', ') || 'None'}
+Tag distribution: ${ctx.tagSummary || 'None'}
+Mana curve (0/1/2/3/4/5/6/7+): ${ctx.cmcBuckets.join('/')} — avg CMC: ${ctx.avgCmc}
 
 Current deck (${deckState.cards.length}/99):
-${cardSummary || 'Empty deck'}
+${ctx.cardSummary || 'Empty deck'}
 
-Skipped cards (do NOT suggest these): ${skipped}
+Cards under review (not yet added — these may hint at directions the user is exploring, but the committed deck list above is the primary signal for the deck's identity): ${ctx.considering}
+
+Cards previously suggested and passed on (do NOT re-suggest these, but don't assume the user rejects the entire category — they may have passed for budget, preference, or redundancy reasons): ${ctx.skipped}
 
 ${instruction}
 
@@ -241,14 +270,18 @@ Generate 2-4 Scryfall queries. Always include f:commander and color identity (ci
 
 function buildSelectionPrompt(deckState, userPrompt, pool) {
   const commander = deckState.commander;
-  const existingTags = [...new Set(deckState.cards.map(c => c.tag).filter(Boolean))];
-  const deckNames = deckState.cards.map(c => c.name).join(', ');
+  const ctx = buildDeckContext(deckState);
 
   const poolSummary = pool.map(c => {
     let info = `${c.name} — ${c.scryfallData?.typeLine || ''}, CMC ${c.scryfallData?.cmc ?? '?'}`;
+    if (c.scryfallData?.prices?.usd) info += `, $${c.scryfallData.prices.usd}`;
     if (c.edhrecSynergy != null) info += `, EDHREC synergy: ${(c.edhrecSynergy * 100).toFixed(0)}%`;
     if (c.edhrecInclusion != null) info += `, in ${(c.edhrecInclusion * 100).toFixed(0)}% of decks`;
-    if (c.combosUnlocked.length > 0) info += `, COMPLETES COMBO with: ${c.combosUnlocked.join(', ')}`;
+    if (c.salt != null) info += `, salt: ${c.salt.toFixed(1)}`;
+    if (c.combosUnlocked.length > 0) {
+      info += `, COMPLETES COMBO with: ${c.combosUnlocked.join(', ')}`;
+      if (c.comboDescription) info += ` (produces: ${c.comboDescription})`;
+    }
     const sources = c.sources.join(', ');
     info += ` [sources: ${sources}]`;
     return info;
@@ -257,15 +290,22 @@ function buildSelectionPrompt(deckState, userPrompt, pool) {
   return `Commander: ${commander?.name || 'Unknown'}
 Strategy: ${deckState.strategy?.notes || 'None'}
 Power level: ${deckState.strategy?.powerLevel || 'mid'}
-Budget cap: ${deckState.strategy?.budgetCap ? '$' + deckState.strategy.budgetCap : 'None'}
-Current deck: ${deckNames}
-Existing tags in deck: ${existingTags.join(', ') || 'None'}
+Budget cap: ${deckState.strategy?.budgetCap ? '$' + deckState.strategy.budgetCap + ' per card' : 'None'}
+Existing tags: ${ctx.existingTags.join(', ') || 'None'}
+Tag distribution: ${ctx.tagSummary || 'None'}
+Mana curve (0/1/2/3/4/5/6/7+): ${ctx.cmcBuckets.join('/')} — avg CMC: ${ctx.avgCmc}
+
+Current deck (${deckState.cards.length}/99):
+${ctx.cardSummary || 'Empty deck'}
+
+Cards under review (not yet added — these may hint at directions the user is exploring, but the committed deck list above is the primary signal for the deck's identity): ${ctx.considering}
+Cards previously suggested and passed on (don't assume the user rejects the entire category — they may have passed for budget, preference, or redundancy reasons): ${ctx.skipped}
 ${userPrompt ? `User is looking for: "${userPrompt}"` : 'User wants general recommendations for what the deck needs most.'}
 
 CANDIDATE POOL (pick ONLY from these cards):
 ${poolSummary}
 
-Pick up to 10 cards from the pool above. For each, include a suggested tag (reuse existing tags where appropriate) and a 1-2 sentence pitch explaining why this card is good for this deck.
+Pick up to 10 cards from the pool above. For each, include a suggested tag (reuse existing tags where appropriate) and a 1-2 sentence pitch that sells the card for THIS deck. Focus on specific interactions with cards already in the deck, how it advances the strategy, or what gap it fills. Do NOT quote synergy percentages, inclusion rates, or other statistics — the UI already shows those.
 
 Respond with JSON:
 {
@@ -330,7 +370,9 @@ async function fetchScryfallPool(queries) {
     sources: ['scryfall'],
     edhrecSynergy: null,
     edhrecInclusion: null,
+    salt: null,
     combosUnlocked: [],
+    comboDescription: '',
   }));
 }
 
@@ -356,7 +398,9 @@ function filterEdhrecPool(edhrecData, filterDescription) {
       sources: ['edhrec'],
       edhrecSynergy: rec.synergy,
       edhrecInclusion: rec.inclusion,
+      salt: rec.salt,
       combosUnlocked: [],
+      comboDescription: '',
     }));
 }
 
@@ -373,7 +417,9 @@ async function fetchSpellbookNearMiss(deckState) {
     sources: ['spellbook'],
     edhrecSynergy: null,
     edhrecInclusion: null,
+    salt: null,
     combosUnlocked: combo.cards.filter(c => c !== combo.missingCard),
+    comboDescription: combo.description || '',
   }));
 }
 
@@ -384,10 +430,11 @@ function mergeCardPool(scryfallCards, edhrecCards, spellbookCards, deckState) {
   const merged = new Map();
   const deckNames = new Set(deckState.cards.map(c => c.name));
   const skippedNames = new Set((deckState.skippedRecommendations || []).map(c => c.name || c));
+  const consideringNames = new Set((deckState.considering || []).map(c => c.name || c));
 
   // Process in order: scryfall first (has full data), then enrich with edhrec/spellbook
   for (const card of [...scryfallCards, ...edhrecCards, ...spellbookCards]) {
-    if (deckNames.has(card.name) || skippedNames.has(card.name)) continue;
+    if (deckNames.has(card.name) || skippedNames.has(card.name) || consideringNames.has(card.name)) continue;
 
     if (merged.has(card.name)) {
       const existing = merged.get(card.name);
@@ -398,7 +445,9 @@ function mergeCardPool(scryfallCards, edhrecCards, spellbookCards, deckState) {
       // Merge metadata (prefer non-null values)
       if (card.edhrecSynergy != null) existing.edhrecSynergy = card.edhrecSynergy;
       if (card.edhrecInclusion != null) existing.edhrecInclusion = card.edhrecInclusion;
+      if (card.salt != null) existing.salt = card.salt;
       if (card.combosUnlocked.length > 0) existing.combosUnlocked = card.combosUnlocked;
+      if (card.comboDescription) existing.comboDescription = card.comboDescription;
       if (card.scryfallData && !existing.scryfallData) existing.scryfallData = card.scryfallData;
     } else {
       merged.set(card.name, { ...card });
