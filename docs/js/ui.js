@@ -344,6 +344,12 @@ function buildDeckPanel(el, state, handlers) {
     if (handlers.onCommanderChange) handlers.onCommanderChange();
   });
 
+  // Commander image click — zoom overlay
+  el.querySelector('#deck-commander-image').addEventListener('click', () => {
+    const img = el.querySelector('#deck-commander-image');
+    if (img && img.src) showCardOverlay(img.src, img.alt);
+  });
+
   // Strategy notes (next to commander image)
   el.querySelector('#strategy-notes').addEventListener('input', debounce((e) => {
     if (handlers.onStrategyUpdate) {
@@ -460,6 +466,8 @@ function buildDeckPanel(el, state, handlers) {
       b.classList.toggle('active', b.dataset.cols === btn.dataset.cols));
     const cardsEl = el.querySelector('#deck-cards');
     cardsEl.classList.toggle('mobile-two-col', mobileDoubleColumn);
+    const cmdArea = el.querySelector('.commander-with-strategy');
+    if (cmdArea) cmdArea.classList.toggle('two-col', mobileDoubleColumn);
     // Also update considering and dismissed panels
     const consideringEl = document.getElementById('considering-panel');
     if (consideringEl && _consideringState) updateConsideringDisplay(consideringEl, _consideringState);
@@ -539,6 +547,10 @@ function updateDeckDisplay(el, state) {
   if (notesEl && document.activeElement !== notesEl) {
     notesEl.value = state.strategy?.notes || '';
   }
+
+  // Sync commander layout with column toggle
+  const cmdArea = el.querySelector('.commander-with-strategy');
+  if (cmdArea) cmdArea.classList.toggle('two-col', mobileDoubleColumn);
 
   // Update cards display
   const cardsEl = el.querySelector('#deck-cards');
@@ -1135,9 +1147,7 @@ function updateRecommendationsDisplay(el, state) {
     suggestBtn.textContent = 'Searching...';
     resultsEl.innerHTML = `
       <div class="loading-status">${escapeHtml(state._recsLoadingStatus || 'Analyzing deck...')}</div>
-      <div class="skeleton skeleton-card"></div>
-      <div class="skeleton skeleton-card"></div>
-      <div class="skeleton skeleton-card"></div>
+      <div class="recs-loading-spinner"></div>
     `;
     return;
   }

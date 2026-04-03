@@ -491,6 +491,20 @@ select.input {
   100% { background-position: -200% 0; }
 }
 
+.recs-loading-spinner {
+  width: 32px;
+  height: 32px;
+  margin: 24px auto;
+  border: 3px solid var(--bg-hover);
+  border-top-color: var(--accent-primary);
+  border-radius: 50%;
+  animation: spinner-spin 0.8s linear infinite;
+}
+
+@keyframes spinner-spin {
+  to { transform: rotate(360deg); }
+}
+
 /* ===== Action Buttons Row ===== */
 .action-buttons {
   display: flex;
@@ -717,8 +731,18 @@ select.input {
 
 .commander-with-strategy {
   display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 16px;
+  max-width: 200px;
+  margin: 0 auto;
+}
+
+.commander-with-strategy.two-col {
+  flex-direction: row;
   align-items: flex-start;
+  max-width: none;
+  margin: 0;
 }
 
 .commander-strategy-area {
@@ -726,14 +750,6 @@ select.input {
   display: flex;
   flex-direction: column;
   gap: 6px;
-}
-
-@media (max-width: 600px) {
-  .commander-with-strategy {
-    flex-direction: column;
-    max-width: 200px;
-    margin: 0 auto;
-  }
 }
 
 .deck-toolbar {
