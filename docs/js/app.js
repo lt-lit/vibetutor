@@ -364,9 +364,17 @@ const handlers = {
   },
 
   onSkipRecommendation(cardName) {
+    const rec = state.recommendationsResults.find(r => r.name === cardName);
+    const dismissedCard = rec ? {
+      name: rec.name,
+      tag: rec.tag || null,
+      scryfallData: rec.scryfallData,
+      pitch: rec.pitch,
+      sources: rec.sources || [],
+    } : { name: cardName };
     updateState({
       recommendationsResults: state.recommendationsResults.filter(r => r.name !== cardName),
-      skippedRecommendations: [...state.skippedRecommendations, cardName],
+      skippedRecommendations: [...state.skippedRecommendations, dismissedCard],
     });
   },
 
@@ -480,6 +488,36 @@ const handlers = {
     });
     ui.showToast(`${cardName} kept in deck`);
   },
+
+  // ---- Dismissed handlers ----
+
+  onRestoreDismissed(cardName) {
+    updateState({
+      skippedRecommendations: state.skippedRecommendations.filter(c => (c.name || c) !== cardName),
+    });
+    ui.showToast(`${cardName} restored — will appear in future recommendations`);
+  },
+
+  onAddFromDismissed(cardName) {
+    const card = state.skippedRecommendations.find(c => (c.name || c) === cardName);
+    if (!card || typeof card === 'string') return;
+
+    if (!state.cards.some(c => c.name === cardName)) {
+      const deckCard = {
+        name: card.name,
+        tag: card.tag || null,
+        scryfallData: card.scryfallData,
+        aiPitch: card.pitch,
+        edhrecSynergy: null,
+        sources: card.sources || [],
+      };
+      updateState({
+        cards: [...state.cards, deckCard],
+        skippedRecommendations: state.skippedRecommendations.filter(c => (c.name || c) !== cardName),
+      });
+      ui.showToast(`Added ${cardName} to deck`);
+    }
+  },
 };
 
 // ============================================================
@@ -498,6 +536,7 @@ function renderActual(scrollToRestore) {
   // Badges and summaries always update (cheap, no innerHTML churn)
   updateBadge('deck', `${state.cards.length}/99`);
   updateBadge('considering', state.considering.length > 0 ? `${state.considering.length}` : '');
+  updateBadge('dismissed', state.skippedRecommendations.length > 0 ? `${state.skippedRecommendations.length}` : '');
   updateBadge('recommendations', state.recommendationsResults.length > 0 ? `${state.recommendationsResults.length}` : '');
   updateBadge('cuts', state.cutsResults.length > 0 ? `${state.cutsResults.length}` : '');
   if (state.commander) updateSummary('strategy', state.commander.name);
@@ -508,15 +547,16 @@ function renderActual(scrollToRestore) {
   const needsStrategy = fullRender || dirty.has('commander') || dirty.has('strategy') || dirty.has('edhrecData');
   const needsDeck = fullRender || dirty.has('cards') || dirty.has('commander') || dirty.has('strategy');
   const needsConsidering = fullRender || dirty.has('considering');
+  const needsDismissed = fullRender || dirty.has('skippedRecommendations');
   const needsRecs = fullRender || dirty.has('recommendationsResults') || dirty.has('_recsLoading')
-    || dirty.has('_recsError') || dirty.has('_recsLoadingStatus') || dirty.has('recentPrompts')
-    || dirty.has('skippedRecommendations');
+    || dirty.has('_recsError') || dirty.has('_recsLoadingStatus') || dirty.has('recentPrompts');
   const needsCuts = fullRender || dirty.has('cutsResults') || dirty.has('_cutsLoading') || dirty.has('_cutsError');
   const needsStats = fullRender || dirty.has('cards') || dirty.has('combos');
 
   if (needsStrategy) ui.renderStrategyPanel(state, handlers);
   if (needsDeck) ui.renderDeckPanel(state, handlers);
   if (needsConsidering) ui.renderConsideringPanel(state, handlers);
+  if (needsDismissed) ui.renderDismissedPanel(state, handlers);
   if (needsRecs) ui.renderRecommendationsPanel(state, handlers);
   if (needsCuts) ui.renderCutsPanel(state, handlers);
   if (needsStats) ui.renderStatsPanel(state);

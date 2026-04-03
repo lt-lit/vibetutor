@@ -205,7 +205,7 @@ function buildQueryPrompt(deckState, userPrompt) {
     .map(c => `${c.name} (${c.scryfallData?.typeLine || ''}, CMC ${c.scryfallData?.cmc ?? '?'})`)
     .join('\n');
   const existingTags = [...new Set(deckState.cards.map(c => c.tag).filter(Boolean))];
-  const skipped = deckState.skippedRecommendations.join(', ') || 'None';
+  const skipped = deckState.skippedRecommendations.map(c => c.name || c).join(', ') || 'None';
 
   let instruction;
   if (userPrompt) {
@@ -383,7 +383,7 @@ async function fetchSpellbookNearMiss(deckState) {
 function mergeCardPool(scryfallCards, edhrecCards, spellbookCards, deckState) {
   const merged = new Map();
   const deckNames = new Set(deckState.cards.map(c => c.name));
-  const skippedNames = new Set(deckState.skippedRecommendations || []);
+  const skippedNames = new Set((deckState.skippedRecommendations || []).map(c => c.name || c));
 
   // Process in order: scryfall first (has full data), then enrich with edhrec/spellbook
   for (const card of [...scryfallCards, ...edhrecCards, ...spellbookCards]) {

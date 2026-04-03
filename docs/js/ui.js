@@ -965,14 +965,6 @@ function buildRecommendationsPanel(el, state, handlers) {
         <div id="recs-recent-prompts" class="mt-sm"></div>
       </div>
       <div id="recs-results"></div>
-      <div id="recs-skipped" hidden>
-        <div class="card-stack-header" id="recs-skipped-header" style="cursor:pointer">
-          <span class="section-arrow">\u25B6</span>
-          <span>Skipped cards</span>
-          <span class="stack-count" id="recs-skipped-count"></span>
-        </div>
-        <div id="recs-skipped-list" hidden></div>
-      </div>
     </div>
   `;
 
@@ -1016,13 +1008,6 @@ function buildRecommendationsPanel(el, state, handlers) {
     if (action === 'skip' && _recsHandlers.onSkipRecommendation) _recsHandlers.onSkipRecommendation(cardName);
   });
 
-  // Skipped section toggle
-  el.querySelector('#recs-skipped-header').addEventListener('click', () => {
-    const list = el.querySelector('#recs-skipped-list');
-    const arrow = el.querySelector('#recs-skipped-header .section-arrow');
-    list.hidden = !list.hidden;
-    arrow.textContent = list.hidden ? '\u25B6' : '\u25BC';
-  });
 }
 
 function updateRecommendationsDisplay(el, state) {
@@ -1089,23 +1074,13 @@ function updateRecommendationsDisplay(el, state) {
           ${metaInfo}
         </div>
         <div class="action-buttons">
-          <button class="btn btn-sm" data-action="skip" data-card="${escapeAttr(rec.name)}">Dismiss</button>
+          <button class="btn btn-sm btn-danger" data-action="skip" data-card="${escapeAttr(rec.name)}">Dismiss</button>
           <button class="btn btn-sm btn-warning" data-action="consider" data-card="${escapeAttr(rec.name)}">Consider</button>
           <button class="btn btn-sm btn-success" data-action="add" data-card="${escapeAttr(rec.name)}">Add</button>
         </div>
       </div>`;
   }).join('');
 
-  // Skipped list
-  const skippedContainer = el.querySelector('#recs-skipped');
-  if (state.skippedRecommendations.length > 0) {
-    skippedContainer.hidden = false;
-    el.querySelector('#recs-skipped-count').textContent = `(${state.skippedRecommendations.length})`;
-    el.querySelector('#recs-skipped-list').innerHTML = state.skippedRecommendations
-      .map(name => `<div class="field-hint" style="padding:2px 0">${escapeHtml(name)}</div>`).join('');
-  } else {
-    skippedContainer.hidden = true;
-  }
 }
 
 // ============================================================
@@ -1314,6 +1289,80 @@ function updateConsideringDisplay(el, state) {
   } else {
     cardsEl.classList.remove('mobile-two-col');
   }
+}
+
+// ============================================================
+// DISMISSED PANEL
+// ============================================================
+
+let _dismissedHandlers = null;
+let _dismissedState = null;
+
+export function renderDismissedPanel(state, handlers) {
+  const el = document.getElementById('dismissed-panel');
+  if (!el) return;
+
+  _dismissedHandlers = handlers;
+  _dismissedState = state;
+
+  if (!initialized.has('dismissed')) {
+    initialized.add('dismissed');
+    buildDismissedPanel(el, state, handlers);
+  }
+
+  updateDismissedDisplay(el, state);
+}
+
+function buildDismissedPanel(el, state, handlers) {
+  el.innerHTML = `
+    <div class="dismissed-content">
+      <div id="dismissed-cards"></div>
+    </div>
+  `;
+
+  el.querySelector('#dismissed-cards').addEventListener('click', (e) => {
+    // Card image click — fullscreen overlay
+    const recCard = e.target.closest('.rec-card');
+    if (recCard && e.target.tagName === 'IMG') {
+      showCardOverlay(e.target.src, recCard.dataset.card);
+      return;
+    }
+
+    const btn = e.target.closest('button[data-action]');
+    if (!btn) return;
+    const cardName = btn.dataset.card;
+    const action = btn.dataset.action;
+    if (action === 'restore' && _dismissedHandlers.onRestoreDismissed) _dismissedHandlers.onRestoreDismissed(cardName);
+    if (action === 'add' && _dismissedHandlers.onAddFromDismissed) _dismissedHandlers.onAddFromDismissed(cardName);
+  });
+}
+
+function updateDismissedDisplay(el, state) {
+  const cardsEl = el.querySelector('#dismissed-cards');
+  if (!cardsEl) return;
+
+  if (state.skippedRecommendations.length === 0) {
+    cardsEl.innerHTML = '<div class="empty-state">Dismissed cards will appear here</div>';
+    return;
+  }
+
+  cardsEl.innerHTML = state.skippedRecommendations.map(card => {
+    const name = card.name || card;
+    const imgUrl = card.scryfallData?.imageUris?.normal || '';
+
+    return `
+      <div class="rec-card" data-card="${escapeAttr(name)}">
+        ${imgUrl ? `<img class="card-image" src="${imgUrl}" alt="${escapeAttr(name)}" loading="lazy">` : ''}
+        <div class="rec-card-info">
+          <p class="rec-pitch" style="color:var(--text-primary)">${escapeHtml(name)}</p>
+          ${card.pitch ? `<p class="rec-pitch">${escapeHtml(card.pitch)}</p>` : ''}
+        </div>
+        <div class="action-buttons">
+          <button class="btn btn-sm" data-action="restore" data-card="${escapeAttr(name)}">Restore</button>
+          ${imgUrl ? `<button class="btn btn-sm btn-success" data-action="add" data-card="${escapeAttr(name)}">Add to Deck</button>` : ''}
+        </div>
+      </div>`;
+  }).join('');
 }
 
 // ============================================================
