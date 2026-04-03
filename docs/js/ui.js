@@ -264,12 +264,14 @@ function buildDeckPanel(el, state, handlers) {
         </div>
         <div id="deck-commander-selected" hidden>
           <div class="commander-with-strategy">
-            <img id="deck-commander-image" class="commander-image card-image" src="" alt="">
+            <div class="commander-image-col">
+              <img id="deck-commander-image" class="commander-image card-image" src="" alt="">
+              <button id="deck-commander-change" class="btn btn-sm mt-sm" style="width:100%">Change Commander</button>
+            </div>
             <div class="commander-strategy-area">
               <label class="field-label" for="strategy-notes">Strategy / Vibe</label>
-              <textarea id="strategy-notes" class="input" rows="5"
+              <textarea id="strategy-notes" class="input"
                         placeholder="e.g., Political chaos, donate bad permanents, pillowfort"></textarea>
-              <button id="deck-commander-change" class="btn btn-sm mt-sm">Change Commander</button>
             </div>
           </div>
         </div>
