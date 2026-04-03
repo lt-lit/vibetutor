@@ -828,9 +828,7 @@ select.input {
   aspect-ratio: 488 / 90;
   overflow: hidden;
   cursor: pointer;
-  border: 3px solid transparent;
-  border-radius: 4.75% / 3.5%;
-  transition: border-color var(--transition-fast);
+  transition: box-shadow var(--transition-fast);
 }
 
 .card-stack-item:not(:last-child) {
@@ -838,20 +836,23 @@ select.input {
 }
 
 .card-stack-item:hover {
-  border-color: var(--accent-secondary);
+  box-shadow: inset 0 0 0 3px var(--accent-secondary);
 }
 
 .card-stack-item:last-child {
   aspect-ratio: auto;
   height: auto;
   overflow: visible;
+  border-radius: 4.75% / 3.5%;
 }
 
 .card-stack-item.expanded {
   aspect-ratio: auto;
   overflow: visible;
   z-index: 10;
-  border: 3px solid var(--accent-secondary);
+  border-radius: 4.75% / 3.5%;
+  outline: 3px solid var(--accent-secondary);
+  outline-offset: -3px;
 }
 
 .card-stack-item.expanded img {
@@ -1376,18 +1377,29 @@ select.input {
 
 /* ===== Mobile Two-Column Stacks ===== */
 @media (max-width: 767px) {
+  .section-content {
+    padding: 8px;
+  }
+
   #deck-cards.mobile-two-col,
   #considering-cards.mobile-two-col,
   #dismissed-cards.mobile-two-col {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 4px;
   }
 
   #deck-cards.mobile-two-col .card-stack,
   #considering-cards.mobile-two-col .card-stack,
   #dismissed-cards.mobile-two-col .card-stack {
-    width: calc(50% - 4px);
+    width: calc(50% - 2px);
+    margin-bottom: 6px;
+  }
+
+  #deck-cards.mobile-two-col .card-stack-header,
+  #considering-cards.mobile-two-col .card-stack-header,
+  #dismissed-cards.mobile-two-col .card-stack-header {
+    padding: 4px 0;
   }
 }
 
