@@ -1176,7 +1176,6 @@ function updateRecommendationsDisplay(el, state) {
     }).join('');
 
     let metaInfo = '';
-    if (rec.edhrecSynergy != null) metaInfo += `<span class="field-hint">Synergy: ${(rec.edhrecSynergy * 100).toFixed(0)}%</span> `;
     if (rec.combosUnlocked?.length > 0) {
       metaInfo += `<div class="combo-alert">Completes combo with: ${rec.combosUnlocked.join(', ')}</div>`;
     }
