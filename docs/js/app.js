@@ -4,13 +4,16 @@
  */
 
 import { initSections, expandSection, collapseSection, updateBadge, updateSummary } from './sections.js';
-import { saveState, loadState } from './storage.js';
+import { saveState, loadState, loadDecks, saveDeckToLibrary, loadDeckFromLibrary, deleteDeckFromLibrary, duplicateDeck, renameDeck } from './storage.js';
 import { fetchEdhrec, commanderToSlug, setApiKey, getApiKey } from './api.js';
 import { findCombos, estimateBracket } from './spellbook.js';
 import * as ui from './ui.js';
 
 /** Debounce helper for combo refresh */
 let comboRefreshTimer = null;
+
+/** Debounce timer for auto-saving to deck library */
+let librarySaveTimer = null;
 
 /** Render batching — coalesce multiple updateState() calls into one render */
 let renderScheduled = false;
@@ -33,6 +36,9 @@ function scheduleRender() {
 /** Default deck state */
 function createDefaultState() {
   return {
+    deckId: null,
+    deckName: null,
+
     commander: null,
 
     strategy: {
@@ -92,6 +98,16 @@ export function updateState(updates) {
   if (updates.cards && updates.cards.length !== prevCardCount) {
     refreshCombos();
   }
+
+  // Auto-save to deck library (debounced 1s)
+  if (state.deckId) {
+    clearTimeout(librarySaveTimer);
+    librarySaveTimer = setTimeout(() => {
+      saveDeckToLibrary(state);
+      dirtyKeys.add('_decksLibrary');
+      scheduleRender();
+    }, 1000);
+  }
 }
 
 /** Debounced combo refresh via Commander Spellbook */
@@ -138,7 +154,13 @@ function updateNestedState(key, updates) {
 const handlers = {
   /** Commander selected from autocomplete dropdown */
   onCommanderSelect(card) {
-    updateState({ commander: card });
+    const updates = { commander: card };
+    // Auto-create deck if this is a new/unsaved deck
+    if (!state.deckId) {
+      updates.deckId = crypto.randomUUID();
+      updates.deckName = card.name;
+    }
+    updateState(updates);
 
     // Fetch EDHREC data in background
     const slug = commanderToSlug(card.name);
@@ -543,6 +565,166 @@ const handlers = {
     });
     ui.showToast(`${cardName} moved to Considering`);
   },
+
+  // ---- My Decks handlers ----
+
+  onNewDeck() {
+    // Save current deck first if it exists
+    if (state.deckId) {
+      saveDeckToLibrary(state);
+    }
+    // Reset to blank state, preserving settings
+    const settings = state.settings;
+    state = { ...createDefaultState(), settings };
+    saveState(state);
+    ui.resetPanel('mydecks');
+    ui.resetPanel('strategy');
+    ui.resetPanel('deck');
+    ui.resetPanel('considering');
+    ui.resetPanel('dismissed');
+    ui.resetPanel('recommendations');
+    ui.resetPanel('cuts');
+    ui.resetPanel('stats');
+    dirtyKeys = new Set();
+    expandSection('strategy');
+    renderActual(null);
+    ui.showToast('New deck started');
+  },
+
+  async onLoadDeck(deckId) {
+    if (deckId === state.deckId) return;
+    // Save current deck first
+    if (state.deckId) {
+      saveDeckToLibrary(state);
+    }
+    const deckData = loadDeckFromLibrary(deckId);
+    if (!deckData) {
+      ui.showToast('Deck not found');
+      return;
+    }
+    // Reset panels so they rebuild fresh
+    ui.resetPanel('mydecks');
+    ui.resetPanel('strategy');
+    ui.resetPanel('deck');
+    ui.resetPanel('considering');
+    ui.resetPanel('dismissed');
+    ui.resetPanel('recommendations');
+    ui.resetPanel('cuts');
+    ui.resetPanel('stats');
+
+    // Rebuild state from saved data
+    const settings = state.settings;
+    state = {
+      ...createDefaultState(),
+      settings,
+      deckId: deckData.deckId,
+      deckName: deckData.deckName,
+      strategy: deckData.strategy || createDefaultState().strategy,
+      cards: deckData.cards.map(c => ({
+        name: c.name,
+        tag: c.tag,
+        scryfallData: null,
+        aiPitch: null,
+        edhrecSynergy: null,
+        sources: c.sources || [],
+      })),
+      considering: (deckData.considering || []).map(c => ({
+        name: c.name,
+        tag: c.tag,
+        scryfallData: null,
+        aiText: null,
+        source: 'saved',
+        inDeck: false,
+        sources: [],
+      })),
+      skippedRecommendations: (deckData.skippedRecommendations || []).map(name =>
+        typeof name === 'string' ? { name, scryfallData: null } : name
+      ),
+      recentPrompts: deckData.recentPrompts || [],
+      iterationCount: deckData.iterationCount || 0,
+    };
+    saveState(state);
+    dirtyKeys = new Set();
+    renderActual(null);
+
+    // Rehydrate commander + Scryfall data in background
+    if (deckData.commander) {
+      try {
+        const { lookupCard } = await import('./scryfall.js');
+        const card = await lookupCard(deckData.commander.name);
+        if (card) {
+          updateState({ commander: card });
+          // Fetch EDHREC data
+          const slug = commanderToSlug(card.name);
+          fetchEdhrec(slug).then(data => {
+            if (data) updateState({ edhrecData: data });
+          });
+        }
+      } catch (e) {
+        console.warn('Failed to rehydrate commander:', e);
+      }
+    }
+
+    // Rehydrate card Scryfall data
+    if (deckData.cards.length > 0) {
+      try {
+        const { bulkLookup } = await import('./scryfall.js');
+        const allNames = [
+          ...deckData.cards.map(c => c.name),
+          ...(deckData.considering || []).map(c => c.name),
+        ];
+        const results = await bulkLookup(allNames);
+        const cardMap = new Map(results.map(c => [c.name, c]));
+
+        const cards = state.cards.map(c => ({
+          ...c,
+          scryfallData: cardMap.get(c.name) || null,
+        }));
+        const considering = state.considering.map(c => ({
+          ...c,
+          scryfallData: cardMap.get(c.name) || null,
+        }));
+        updateState({ cards, considering });
+      } catch (e) {
+        console.warn('Failed to rehydrate card data:', e);
+      }
+    }
+
+    ui.showToast(`Loaded "${deckData.deckName}"`);
+  },
+
+  onDeleteDeck(deckId) {
+    deleteDeckFromLibrary(deckId);
+    // If deleting the active deck, reset to new
+    if (deckId === state.deckId) {
+      handlers.onNewDeck();
+    } else {
+      dirtyKeys.add('_decksLibrary');
+      scheduleRender();
+    }
+    ui.showToast('Deck deleted');
+  },
+
+  onDuplicateDeck(deckId) {
+    const newId = duplicateDeck(deckId);
+    if (newId) {
+      dirtyKeys.add('_decksLibrary');
+      scheduleRender();
+      ui.showToast('Deck duplicated');
+    }
+  },
+
+  onRenameDeck(deckId, name) {
+    renameDeck(deckId, name);
+    // If renaming the active deck, update working state too
+    if (deckId === state.deckId) {
+      state = { ...state, deckName: name };
+      saveState(state);
+    }
+    dirtyKeys.add('_decksLibrary');
+    dirtyKeys.add('deckName');
+    scheduleRender();
+  },
 };
 
 // ============================================================
@@ -559,6 +741,8 @@ function renderActual(scrollToRestore) {
   const fullRender = dirty.size === 0;
 
   // Badges and summaries always update (cheap, no innerHTML churn)
+  const decks = loadDecks();
+  updateBadge('mydecks', decks.length > 0 ? `${decks.length}` : '');
   updateBadge('deck', `${state.cards.length}/99`);
   updateBadge('considering', state.considering.length > 0 ? `${state.considering.length}` : '');
   updateBadge('dismissed', state.skippedRecommendations.length > 0 ? `${state.skippedRecommendations.length}` : '');
@@ -569,6 +753,7 @@ function renderActual(scrollToRestore) {
   ui.updateSettingsMenu(state);
 
   // Selective panel rendering — only rebuild panels whose data changed
+  const needsMyDecks = fullRender || dirty.has('_decksLibrary') || dirty.has('deckId') || dirty.has('deckName');
   const needsStrategy = fullRender || dirty.has('commander') || dirty.has('strategy') || dirty.has('edhrecData');
   const needsDeck = fullRender || dirty.has('cards') || dirty.has('commander') || dirty.has('strategy');
   const needsConsidering = fullRender || dirty.has('considering');
@@ -578,6 +763,7 @@ function renderActual(scrollToRestore) {
   const needsCuts = fullRender || dirty.has('cutsResults') || dirty.has('_cutsLoading') || dirty.has('_cutsError');
   const needsStats = fullRender || dirty.has('cards') || dirty.has('combos');
 
+  if (needsMyDecks) ui.renderMyDecksPanel(state, decks, handlers);
   if (needsStrategy) ui.renderStrategyPanel(state, handlers);
   if (needsDeck) ui.renderDeckPanel(state, handlers);
   if (needsConsidering) ui.renderConsideringPanel(state, handlers);
