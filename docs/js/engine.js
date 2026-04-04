@@ -241,7 +241,6 @@ Translate this into creative Scryfall queries. Approach the concept from multipl
   }
 
   return `Commander: ${commander?.name || 'Unknown'} (color identity: ${ci})
-Power level: ${deckState.strategy?.powerLevel || 'mid'}
 Strategy notes: ${deckState.strategy?.notes || 'None'}
 Budget cap: ${deckState.strategy?.budgetCap ? '$' + deckState.strategy.budgetCap + ' per card' : 'None'}
 Existing tags: ${ctx.existingTags.join(', ') || 'None'}
@@ -289,7 +288,6 @@ function buildSelectionPrompt(deckState, userPrompt, pool) {
 
   return `Commander: ${commander?.name || 'Unknown'}
 Strategy: ${deckState.strategy?.notes || 'None'}
-Power level: ${deckState.strategy?.powerLevel || 'mid'}
 Budget cap: ${deckState.strategy?.budgetCap ? '$' + deckState.strategy.budgetCap + ' per card' : 'None'}
 Existing tags: ${ctx.existingTags.join(', ') || 'None'}
 Tag distribution: ${ctx.tagSummary || 'None'}
@@ -331,7 +329,6 @@ function buildCutsPrompt(deckState) {
 
   return `Commander: ${commander?.name || 'Unknown'}
 Strategy: ${deckState.strategy?.notes || 'None'}
-Power level: ${deckState.strategy?.powerLevel || 'mid'}
 
 Cards user has chosen to KEEP (do NOT suggest cutting these): ${kept}
 
