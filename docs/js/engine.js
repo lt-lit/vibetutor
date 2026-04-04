@@ -283,6 +283,9 @@ function buildSelectionPrompt(deckState, userPrompt, pool) {
       info += `, COMPLETES COMBO with: ${c.combosUnlocked.join(', ')}`;
       if (c.comboDescription) info += ` (produces: ${c.comboDescription})`;
     }
+    if (c.scryfallData?.setName) info += `, set: ${c.scryfallData.setName}`;
+    if (c.scryfallData?.rarity) info += `, rarity: ${c.scryfallData.rarity}`;
+    if (c.scryfallData?.artist) info += `, artist: ${c.scryfallData.artist}`;
     const sources = c.sources.join(', ');
     info += ` [sources: ${sources}]`;
     return info;
