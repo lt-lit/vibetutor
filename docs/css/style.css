@@ -146,6 +146,8 @@ body {
   -webkit-user-select: none;
   background: var(--section-header-bg);
   transition: background var(--transition-fast);
+  border-left: 3px solid var(--section-accent);
+  border-right: 3px solid var(--section-accent);
 }
 
 .section-header:hover {
