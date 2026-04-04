@@ -18,6 +18,23 @@ function debounce(fn, ms) {
   };
 }
 
+/** Scroll-lock helpers to prevent background scrolling when modals are open */
+let _scrollLockCount = 0;
+
+function lockScroll() {
+  _scrollLockCount++;
+  if (_scrollLockCount === 1) {
+    document.body.style.overflow = 'hidden';
+  }
+}
+
+function unlockScroll() {
+  _scrollLockCount = Math.max(0, _scrollLockCount - 1);
+  if (_scrollLockCount === 0) {
+    document.body.style.overflow = '';
+  }
+}
+
 // ============================================================
 // MY DECKS PANEL
 // ============================================================
@@ -942,10 +959,11 @@ async function openPrintingSelector(cardName) {
       <div class="printing-loading">Loading printings...</div>
     </div>`;
   document.body.appendChild(backdrop);
+  lockScroll();
 
   const modal = backdrop.querySelector('.modal');
 
-  const close = () => backdrop.remove();
+  const close = () => { backdrop.remove(); unlockScroll(); };
   backdrop.addEventListener('click', (e) => {
     if (e.target === backdrop) close();
   });
@@ -1018,11 +1036,14 @@ function showImportModal(handlers) {
     </div>
   `;
   document.body.appendChild(backdrop);
+  lockScroll();
+
+  const closeImport = () => { backdrop.remove(); unlockScroll(); };
 
   // Cancel
-  backdrop.querySelector('#import-cancel').addEventListener('click', () => backdrop.remove());
+  backdrop.querySelector('#import-cancel').addEventListener('click', closeImport);
   backdrop.addEventListener('click', (e) => {
-    if (e.target === backdrop) backdrop.remove();
+    if (e.target === backdrop) closeImport();
   });
 
   // Submit
@@ -1059,10 +1080,10 @@ function showImportModal(handlers) {
       `;
       submitBtn.textContent = 'Done';
       submitBtn.disabled = false;
-      submitBtn.addEventListener('click', () => backdrop.remove(), { once: true });
+      submitBtn.addEventListener('click', closeImport, { once: true });
     } else {
       showToast(`Imported ${found.length} cards`);
-      backdrop.remove();
+      closeImport();
     }
   });
 }
@@ -1930,6 +1951,7 @@ export function showCardOverlay(imageUrl, altText) {
   img.src = imageUrl;
   img.alt = altText || 'Card preview';
   overlay.hidden = false;
+  lockScroll();
 }
 
 /**
@@ -1940,6 +1962,7 @@ export function hideCardOverlay() {
   if (overlay) {
     overlay.hidden = true;
     overlay.querySelector('.card-overlay-image').src = '';
+    unlockScroll();
   }
 }
 
