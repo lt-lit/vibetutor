@@ -43,7 +43,6 @@ function createDefaultState() {
 
     strategy: {
       notes: '',
-      powerLevel: 'mid',
       budgetCap: null,
     },
 

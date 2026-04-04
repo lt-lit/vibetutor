@@ -10,7 +10,7 @@
   --text-secondary: #a0a0b8;
   --text-muted: #6c6c88;
 
-  --accent-primary: #7c5cbf;
+  --accent-primary: #5c8cbf;
   --accent-secondary: #5c9cf5;
   --accent-success: #4caf50;
   --accent-warning: #f5a623;
@@ -37,6 +37,13 @@
 
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --font-mono: 'SF Mono', 'Fira Code', 'Fira Mono', Menlo, Consolas, monospace;
+
+  /* Section color tokens (defaults, overridden per-section) */
+  --section-header-bg: var(--bg-secondary);
+  --section-header-hover: var(--bg-hover);
+  --section-content-bg: var(--bg-primary);
+  --section-accent: var(--border-color);
+  --section-name-color: var(--text-primary);
 }
 
 /* ===== Reset & Base ===== */
@@ -137,12 +144,14 @@ body {
   cursor: pointer;
   user-select: none;
   -webkit-user-select: none;
-  background: var(--bg-secondary);
+  background: var(--section-header-bg);
   transition: background var(--transition-fast);
+  border-left: 3px solid var(--section-accent);
+  border-right: 3px solid var(--section-accent);
 }
 
 .section-header:hover {
-  background: var(--bg-hover);
+  background: var(--section-header-hover);
 }
 
 .section-header:focus-visible {
@@ -162,14 +171,14 @@ body {
 .section-name {
   font-size: 1rem;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--section-name-color);
   flex-shrink: 0;
 }
 
 .section-badge {
   font-size: 0.75rem;
-  color: var(--text-secondary);
-  background: var(--bg-card);
+  color: var(--section-name-color);
+  background: var(--section-accent);
   padding: 2px 8px;
   border-radius: 10px;
   flex-shrink: 0;
@@ -194,11 +203,56 @@ body {
 
 .section-content {
   padding: 16px;
-  background: var(--bg-primary);
+  background: var(--section-content-bg);
+  border-left: 3px solid var(--section-accent);
+  border-right: 3px solid var(--section-accent);
 }
 
 .section.collapsed .section-content {
   display: none;
+}
+
+/* ===== Per-Section Color Coding ===== */
+[data-section="mydecks"] {
+  --section-content-bg: #1a1a2e;
+  --section-accent: #a0a0b8;
+  --section-name-color: #e0e0f0;
+}
+
+[data-section="stats"] {
+  --section-content-bg: #1a1a2e;
+  --section-accent: #5060a0;
+  --section-name-color: #a0b0e0;
+}
+
+[data-section="deck"] {
+  --section-content-bg: #1a1a2e;
+  --section-accent: #40c058;
+  --section-name-color: #55f070;
+}
+
+[data-section="considering"] {
+  --section-content-bg: #1a1a2e;
+  --section-accent: #d0a820;
+  --section-name-color: #ffe040;
+}
+
+[data-section="dismissed"] {
+  --section-content-bg: #1a1a2e;
+  --section-accent: #e03050;
+  --section-name-color: #ff5070;
+}
+
+[data-section="recommendations"] {
+  --section-content-bg: #1a1a2e;
+  --section-accent: #9060d0;
+  --section-name-color: #c098ff;
+}
+
+[data-section="cuts"] {
+  --section-content-bg: #1a1a2e;
+  --section-accent: #d08030;
+  --section-name-color: #ffaa40;
 }
 
 /* ===== Buttons ===== */
@@ -238,8 +292,8 @@ body {
 }
 
 .btn-primary:hover {
-  background: #6a4bab;
-  border-color: #6a4bab;
+  background: #4a7aab;
+  border-color: #4a7aab;
 }
 
 .btn-success {
@@ -456,7 +510,7 @@ select.input {
   color: #fff;
 }
 
-.source-badge.source-scryfall { background: #6e5494; }
+.source-badge.source-scryfall { background: #4a7a9e; }
 .source-badge.source-edhrec { background: #1c6ea4; }
 .source-badge.source-spellbook { background: #c0392b; }
 
@@ -1074,8 +1128,7 @@ select.input {
   overflow: hidden;
   background: var(--bg-card);
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
+  flex-direction: column;
 }
 
 .deck-tile-active {
@@ -1084,15 +1137,12 @@ select.input {
 }
 
 .deck-tile .card-image {
-  border-radius: 0;
-  width: 140px;
-  min-width: 140px;
+  width: 100%;
   cursor: default;
 }
 
 .deck-tile-no-img {
-  width: 140px;
-  min-width: 140px;
+  width: 100%;
   height: 100px;
   background: var(--bg-input);
   display: flex;
@@ -1128,6 +1178,25 @@ select.input {
   padding: 0 12px 12px;
 }
 
+#mydecks-list.two-col .deck-tile {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: stretch;
+}
+
+#mydecks-list.two-col .deck-tile .card-image {
+  width: 50%;
+}
+
+#mydecks-list.two-col .deck-tile-no-img {
+  width: 50%;
+  min-width: 0;
+}
+
+#mydecks-list.two-col .deck-tile > .action-buttons {
+  width: 100%;
+}
+
 /* ===== Recommendation / Cut Cards ===== */
 .rec-card {
   margin-bottom: 16px;
@@ -1136,20 +1205,33 @@ select.input {
   overflow: hidden;
   background: var(--bg-card);
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
+  flex-direction: column;
 }
 
 .rec-card > .action-buttons {
-  width: 100%;
   padding: 0 12px 12px;
 }
 
 .rec-card .card-image {
-  border-radius: 0;
-  width: 160px;
-  min-width: 160px;
+  width: 100%;
   cursor: pointer;
+}
+
+#recs-results.two-col .rec-card,
+#cuts-results.two-col .rec-card {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: stretch;
+}
+
+#recs-results.two-col .rec-card .card-image,
+#cuts-results.two-col .rec-card .card-image {
+  width: 50%;
+}
+
+#recs-results.two-col .rec-card > .action-buttons,
+#cuts-results.two-col .rec-card > .action-buttons {
+  width: 100%;
 }
 
 .rec-card-info {
@@ -1421,12 +1503,6 @@ select.input {
 
   .card-stack {
     width: 250px;
-  }
-
-  #recs-results {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
-    gap: 16px;
   }
 
   .sections-container {

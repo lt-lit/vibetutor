@@ -98,6 +98,7 @@ function buildMyDecksPanel(el, state, decks, handlers) {
 function updateMyDecksDisplay(el, state, decks) {
   const listEl = el.querySelector('#mydecks-list');
   if (!listEl) return;
+  listEl.classList.toggle('two-col', mobileDoubleColumn);
 
   if (decks.length === 0) {
     listEl.innerHTML = '<p class="field-hint" style="margin-top:12px">No saved decks yet. Select a commander to start your first deck.</p>';
@@ -470,11 +471,17 @@ function buildDeckPanel(el, state, handlers) {
     cardsEl.classList.toggle('mobile-two-col', mobileDoubleColumn);
     const cmdArea = el.querySelector('.commander-with-strategy');
     if (cmdArea) cmdArea.classList.toggle('two-col', mobileDoubleColumn);
-    // Also update considering and dismissed panels
+    // Also update considering, dismissed, recs, and cuts panels
     const consideringEl = document.getElementById('considering-panel');
     if (consideringEl && _consideringState) updateConsideringDisplay(consideringEl, _consideringState);
     const dismissedEl = document.getElementById('dismissed-panel');
     if (dismissedEl && _dismissedState) updateDismissedDisplay(dismissedEl, _dismissedState);
+    const recsResults = document.getElementById('recs-results');
+    if (recsResults) recsResults.classList.toggle('two-col', mobileDoubleColumn);
+    const cutsResults = document.getElementById('cuts-results');
+    if (cutsResults) cutsResults.classList.toggle('two-col', mobileDoubleColumn);
+    const mydecksList = document.getElementById('mydecks-list');
+    if (mydecksList) mydecksList.classList.toggle('two-col', mobileDoubleColumn);
   });
 
   // --- Event delegation on cards container ---
@@ -1040,34 +1047,14 @@ function buildRecommendationsPanel(el, state, handlers) {
         <div id="recs-recent-prompts" class="mt-sm"></div>
       </div>
       <div class="recs-settings">
-        <div class="flex gap-md" style="flex-wrap:wrap;align-items:flex-end">
-          <div class="field-group" style="flex:1;min-width:200px">
-            <label class="field-label">Power Level</label>
-            <div class="segmented-control" id="power-level-control">
-              <button data-level="casual">Casual</button>
-              <button data-level="mid">Mid</button>
-              <button data-level="high">High</button>
-              <button data-level="cedh">cEDH</button>
-            </div>
-          </div>
-          <div class="field-group" style="flex-direction:row;align-items:center;gap:8px">
-            <label class="field-label" for="budget-cap" style="white-space:nowrap;margin:0">Budget Cap ($/card)</label>
-            <input type="number" id="budget-cap" class="input" min="0" step="0.5" placeholder="No limit" style="width:100px">
-          </div>
+        <div class="field-group" style="flex-direction:row;align-items:center;gap:8px">
+          <label class="field-label" for="budget-cap" style="white-space:nowrap;margin:0">Budget Cap ($/card)</label>
+          <input type="number" id="budget-cap" class="input" min="0" step="0.5" placeholder="No limit" style="width:100px">
         </div>
       </div>
       <div id="recs-results"></div>
     </div>
   `;
-
-  // Power level
-  el.querySelector('#power-level-control').addEventListener('click', (e) => {
-    const btn = e.target.closest('button[data-level]');
-    if (!btn) return;
-    if (handlers.onStrategyUpdate) {
-      handlers.onStrategyUpdate({ powerLevel: btn.dataset.level });
-    }
-  });
 
   // Budget cap
   el.querySelector('#budget-cap').addEventListener('input', debounce((e) => {
@@ -1120,12 +1107,6 @@ function buildRecommendationsPanel(el, state, handlers) {
 }
 
 function updateRecommendationsDisplay(el, state) {
-  // Update power level buttons
-  const powerBtns = el.querySelectorAll('#power-level-control button');
-  powerBtns.forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.level === state.strategy?.powerLevel);
-  });
-
   // Update budget cap (only if not focused)
   const budgetEl = el.querySelector('#budget-cap');
   if (budgetEl && document.activeElement !== budgetEl) {
@@ -1142,6 +1123,7 @@ function updateRecommendationsDisplay(el, state) {
 
   // Results
   const resultsEl = el.querySelector('#recs-results');
+  resultsEl.classList.toggle('two-col', mobileDoubleColumn);
   const suggestBtn = el.querySelector('#recs-suggest-btn');
 
   if (state._recsLoading) {
@@ -1257,6 +1239,7 @@ function buildCutsPanel(el, state, handlers) {
 
 function updateCutsDisplay(el, state) {
   const resultsEl = el.querySelector('#cuts-results');
+  resultsEl.classList.toggle('two-col', mobileDoubleColumn);
   const suggestBtn = el.querySelector('#cuts-suggest-btn');
 
   if (state._cutsLoading) {
