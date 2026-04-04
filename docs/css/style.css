@@ -1116,8 +1116,7 @@ select.input {
   overflow: hidden;
   background: var(--bg-card);
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
+  flex-direction: column;
 }
 
 .deck-tile-active {
@@ -1126,15 +1125,12 @@ select.input {
 }
 
 .deck-tile .card-image {
-  border-radius: 0;
-  width: 140px;
-  min-width: 140px;
+  width: 100%;
   cursor: default;
 }
 
 .deck-tile-no-img {
-  width: 140px;
-  min-width: 140px;
+  width: 100%;
   height: 100px;
   background: var(--bg-input);
   display: flex;
@@ -1170,6 +1166,25 @@ select.input {
   padding: 0 12px 12px;
 }
 
+#mydecks-list.two-col .deck-tile {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: stretch;
+}
+
+#mydecks-list.two-col .deck-tile .card-image {
+  width: 50%;
+}
+
+#mydecks-list.two-col .deck-tile-no-img {
+  width: 50%;
+  min-width: 0;
+}
+
+#mydecks-list.two-col .deck-tile > .action-buttons {
+  width: 100%;
+}
+
 /* ===== Recommendation / Cut Cards ===== */
 .rec-card {
   margin-bottom: 16px;
@@ -1186,7 +1201,6 @@ select.input {
 }
 
 .rec-card .card-image {
-  border-radius: 0;
   width: 100%;
   cursor: pointer;
 }

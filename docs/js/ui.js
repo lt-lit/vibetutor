@@ -98,6 +98,7 @@ function buildMyDecksPanel(el, state, decks, handlers) {
 function updateMyDecksDisplay(el, state, decks) {
   const listEl = el.querySelector('#mydecks-list');
   if (!listEl) return;
+  listEl.classList.toggle('two-col', mobileDoubleColumn);
 
   if (decks.length === 0) {
     listEl.innerHTML = '<p class="field-hint" style="margin-top:12px">No saved decks yet. Select a commander to start your first deck.</p>';
@@ -479,6 +480,8 @@ function buildDeckPanel(el, state, handlers) {
     if (recsResults) recsResults.classList.toggle('two-col', mobileDoubleColumn);
     const cutsResults = document.getElementById('cuts-results');
     if (cutsResults) cutsResults.classList.toggle('two-col', mobileDoubleColumn);
+    const mydecksList = document.getElementById('mydecks-list');
+    if (mydecksList) mydecksList.classList.toggle('two-col', mobileDoubleColumn);
   });
 
   // --- Event delegation on cards container ---
