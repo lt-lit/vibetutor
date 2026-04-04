@@ -259,6 +259,29 @@ const handlers = {
     updateState(updates);
   },
 
+  /** Switch a card's printing (works across deck, considering, and dismissed) */
+  onSwitchPrinting(cardName, newScryfallData) {
+    const updates = {};
+    if (state.cards.some(c => c.name === cardName)) {
+      updates.cards = state.cards.map(c =>
+        c.name === cardName ? { ...c, scryfallData: newScryfallData } : c
+      );
+    }
+    if (state.considering.some(c => c.name === cardName)) {
+      updates.considering = state.considering.map(c =>
+        c.name === cardName ? { ...c, scryfallData: newScryfallData } : c
+      );
+    }
+    if (state.skippedRecommendations.some(c => c.name === cardName)) {
+      updates.skippedRecommendations = state.skippedRecommendations.map(c =>
+        c.name === cardName ? { ...c, scryfallData: newScryfallData } : c
+      );
+    }
+    if (Object.keys(updates).length > 0) {
+      updateState(updates);
+    }
+  },
+
   /** Import cards from a parsed decklist */
   onImportCards(scryfallCards) {
     const existing = new Set(state.cards.map(c => c.name));

@@ -3,7 +3,7 @@
  * Renders panels and handles user interactions.
  */
 
-import { searchCards, autocomplete, lookupCard, bulkLookup, parseDecklistText } from './scryfall.js';
+import { searchCards, autocomplete, lookupCard, bulkLookup, parseDecklistText, fetchAllPrintings } from './scryfall.js';
 import { exportPlain, exportMoxfield, exportArena } from './export.js';
 
 /** Track which panels have been initialized to avoid re-rendering on every state change */
@@ -774,6 +774,7 @@ function openCardOptionsMenu(anchorEl, cardName) {
     <div class="card-options-item" data-action="remove">Remove from deck</div>
     <div class="card-options-item" data-action="considering">Move to Considering</div>
     <div class="card-options-item" data-action="tags">Manage Tags</div>
+    <div class="card-options-item" data-action="printing">Switch Printing</div>
   `;
 
   // Position using fixed positioning relative to the button
@@ -802,6 +803,8 @@ function openCardOptionsMenu(anchorEl, cardName) {
       if (_deckHandlers.onMoveToConsidering) _deckHandlers.onMoveToConsidering(cardName);
     } else if (action === 'tags') {
       openTagEditor(anchorEl, cardName, _deckState, _deckHandlers);
+    } else if (action === 'printing') {
+      openPrintingSelector(cardName);
     }
     menu.remove();
   });
@@ -831,10 +834,12 @@ function openConsideringOptionsMenu(anchorEl, cardName) {
   const menuItems = card.inDeck
     ? `<div class="card-options-item" data-action="cut">Cut from Deck</div>
        <div class="card-options-item" data-action="keep">Keep in Deck</div>
-       <div class="card-options-item" data-action="tags">Manage Tags</div>`
+       <div class="card-options-item" data-action="tags">Manage Tags</div>
+       <div class="card-options-item" data-action="printing">Switch Printing</div>`
     : `<div class="card-options-item" data-action="add">Add to Deck</div>
        <div class="card-options-item" data-action="dismiss">Dismiss</div>
-       <div class="card-options-item" data-action="tags">Manage Tags</div>`;
+       <div class="card-options-item" data-action="tags">Manage Tags</div>
+       <div class="card-options-item" data-action="printing">Switch Printing</div>`;
 
   const menu = document.createElement('div');
   menu.className = 'card-options-menu';
@@ -865,6 +870,9 @@ function openConsideringOptionsMenu(anchorEl, cardName) {
     if (action === 'tags') {
       openTagEditor(anchorEl, cardName, _consideringState, _consideringHandlers);
     }
+    if (action === 'printing') {
+      openPrintingSelector(cardName);
+    }
     menu.remove();
   });
 
@@ -877,6 +885,117 @@ function openConsideringOptionsMenu(anchorEl, cardName) {
     };
     document.addEventListener('click', closeHandler);
   }, 0);
+}
+
+// ============================================================
+// PRINTING SELECTOR MODAL
+// ============================================================
+
+const PRINTING_PAGE_SIZE = 20;
+
+function getCurrentScryfallId(cardName) {
+  const inDeck = _deckState?.cards?.find(c => c.name === cardName);
+  if (inDeck?.scryfallData?.scryfallId) return inDeck.scryfallData.scryfallId;
+  const inCons = _consideringState?.considering?.find(c => c.name === cardName);
+  if (inCons?.scryfallData?.scryfallId) return inCons.scryfallData.scryfallId;
+  const inDismissed = _dismissedState?.skippedRecommendations?.find(c => (c.name || c) === cardName);
+  if (inDismissed?.scryfallData?.scryfallId) return inDismissed.scryfallData.scryfallId;
+  return null;
+}
+
+function renderPrintingCard(printing, currentScryfallId) {
+  const isCurrent = printing.scryfallData.scryfallId === currentScryfallId;
+  let priceText = '';
+  if (printing.priceUsd && printing.priceFoil) {
+    priceText = `$${printing.priceUsd} / $${printing.priceFoil} foil`;
+  } else if (printing.priceUsd) {
+    priceText = `$${printing.priceUsd}`;
+  } else if (printing.priceFoil) {
+    priceText = `$${printing.priceFoil} foil`;
+  }
+
+  return `
+    <div class="printing-card${isCurrent ? ' printing-card-current' : ''}" data-scryfallid="${escapeAttr(printing.scryfallData.scryfallId)}">
+      ${printing.imageNormal ? `<img class="card-image" src="${printing.imageNormal}" alt="${escapeAttr(printing.setName)}" loading="lazy">` : ''}
+      <div class="printing-card-info">
+        <div class="printing-set-line">
+          <span class="printing-set-name">${escapeHtml(printing.setName)}</span>
+          ${printing.year ? `<span class="printing-year-badge">${printing.year}</span>` : ''}
+        </div>
+        <span class="printing-detail">${escapeHtml(printing.rarity)} · ${escapeHtml(printing.setCode)} (${escapeHtml(printing.collectorNumber)})</span>
+        ${priceText ? `<span class="printing-prices">${escapeHtml(priceText)}</span>` : ''}
+      </div>
+      <div class="action-buttons">
+        <button class="btn btn-sm btn-primary" data-action="select">${isCurrent ? 'Current' : 'Select'}</button>
+      </div>
+    </div>`;
+}
+
+async function openPrintingSelector(cardName) {
+  const currentId = getCurrentScryfallId(cardName);
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.innerHTML = `
+    <div class="modal printing-selector-modal">
+      <h2>Switch Printing — ${escapeHtml(cardName)}</h2>
+      <div class="printing-loading">Loading printings...</div>
+    </div>`;
+  document.body.appendChild(backdrop);
+
+  const modal = backdrop.querySelector('.modal');
+
+  const close = () => backdrop.remove();
+  backdrop.addEventListener('click', (e) => {
+    if (e.target === backdrop) close();
+  });
+  const escHandler = (e) => {
+    if (e.key === 'Escape') { close(); document.removeEventListener('keydown', escHandler); }
+  };
+  document.addEventListener('keydown', escHandler);
+
+  const printings = await fetchAllPrintings(cardName);
+  const loadingEl = modal.querySelector('.printing-loading');
+
+  if (!printings || printings.length === 0) {
+    loadingEl.textContent = 'No printings found.';
+    return;
+  }
+
+  loadingEl.remove();
+
+  const listEl = document.createElement('div');
+  listEl.className = `printing-list${mobileDoubleColumn ? ' two-col' : ''}`;
+  modal.appendChild(listEl);
+
+  const visibleCount = Math.min(PRINTING_PAGE_SIZE, printings.length);
+  listEl.innerHTML = printings.slice(0, visibleCount).map(p => renderPrintingCard(p, currentId)).join('');
+
+  if (printings.length > PRINTING_PAGE_SIZE) {
+    const showMoreBtn = document.createElement('button');
+    showMoreBtn.className = 'btn btn-sm';
+    showMoreBtn.textContent = `Show all ${printings.length} printings`;
+    showMoreBtn.style.marginTop = '8px';
+    showMoreBtn.style.width = '100%';
+    modal.appendChild(showMoreBtn);
+    showMoreBtn.addEventListener('click', () => {
+      listEl.innerHTML += printings.slice(PRINTING_PAGE_SIZE).map(p => renderPrintingCard(p, currentId)).join('');
+      showMoreBtn.remove();
+    });
+  }
+
+  listEl.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-action="select"]');
+    if (!btn) return;
+    const card = btn.closest('.printing-card');
+    if (!card) return;
+    const scryfallId = card.dataset.scryfallid;
+    const printing = printings.find(p => p.scryfallData.scryfallId === scryfallId);
+    if (printing && _deckHandlers?.onSwitchPrinting) {
+      _deckHandlers.onSwitchPrinting(cardName, printing.scryfallData);
+      close();
+    }
+  });
 }
 
 // ============================================================
@@ -1509,7 +1628,8 @@ function openDismissedOptionsMenu(anchorEl, cardName) {
     <div class="card-options-item" data-action="add">Add to Deck</div>
     <div class="card-options-item" data-action="consider">Move to Considering</div>
     <div class="card-options-item" data-action="remove">Remove</div>
-    <div class="card-options-item" data-action="tags">Manage Tags</div>`;
+    <div class="card-options-item" data-action="tags">Manage Tags</div>
+    <div class="card-options-item" data-action="printing">Switch Printing</div>`;
 
   const menu = document.createElement('div');
   menu.className = 'card-options-menu';
@@ -1538,6 +1658,9 @@ function openDismissedOptionsMenu(anchorEl, cardName) {
     if (action === 'remove') _dismissedHandlers?.onRemoveDismissed?.(cardName);
     if (action === 'tags') {
       openTagEditor(anchorEl, cardName, _dismissedState, _dismissedHandlers);
+    }
+    if (action === 'printing') {
+      openPrintingSelector(cardName);
     }
     menu.remove();
   });
