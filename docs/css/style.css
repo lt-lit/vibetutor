@@ -212,11 +212,16 @@ body {
 
 /* ===== Per-Section Color Coding ===== */
 [data-section="mydecks"],
-[data-section="deck"],
 [data-section="stats"] {
   --section-content-bg: #1a1a2e;
   --section-accent: #3a4060;
   --section-name-color: #9aa0bc;
+}
+
+[data-section="deck"] {
+  --section-content-bg: #1a1a2e;
+  --section-accent: #38984a;
+  --section-name-color: #50d068;
 }
 
 [data-section="considering"] {
@@ -233,8 +238,8 @@ body {
 
 [data-section="recommendations"] {
   --section-content-bg: #1a1a2e;
-  --section-accent: #38984a;
-  --section-name-color: #50d068;
+  --section-accent: #7050a0;
+  --section-name-color: #b088e8;
 }
 
 [data-section="cuts"] {
