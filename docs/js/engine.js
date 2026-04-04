@@ -234,8 +234,9 @@ function buildQueryPrompt(deckState, userPrompt) {
 
   let instruction;
   if (userPrompt) {
-    instruction = `The user is looking for: "${userPrompt}"
-Translate this into creative Scryfall queries. Approach the concept from multiple angles.`;
+    instruction = `The user's query is the PRIMARY DIRECTIVE: "${userPrompt}"
+If the query specifies a hard constraint (set, rarity, price, card type, etc.), ALL generated Scryfall queries MUST include the corresponding filter. Do not generate queries that ignore the user's constraint.
+Translate this into creative Scryfall queries. Approach the concept from multiple angles while always respecting the constraint.`;
   } else {
     instruction = `The user left the prompt empty. Analyze the deck holistically and decide what it needs most. Consider mana curve gaps, card draw density, removal count, win conditions, and synergy gaps.`;
   }
@@ -264,7 +265,8 @@ Respond with JSON:
   "edhrecFilter": "conceptual description for filtering EDHREC data"
 }
 
-Generate 2-4 Scryfall queries. Always include f:commander and color identity (ci:${ci || 'c'}).`;
+Generate 2-4 Scryfall queries. Always include f:commander and color identity (ci:${ci || 'c'}).
+If the user specifies a set name, determine the correct Scryfall set code and include it (e.g., s:dsk) in EVERY query.`;
 }
 
 function buildSelectionPrompt(deckState, userPrompt, pool) {
@@ -298,7 +300,8 @@ ${ctx.cardSummary || 'Empty deck'}
 
 Cards under review (not yet added — these may hint at directions the user is exploring, but the committed deck list above is the primary signal for the deck's identity): ${ctx.considering}
 Cards previously suggested and passed on (don't assume the user rejects the entire category — they may have passed for budget, preference, or redundancy reasons): ${ctx.skipped}
-${userPrompt ? `User is looking for: "${userPrompt}"` : 'User wants general recommendations for what the deck needs most.'}
+${userPrompt ? `PRIMARY DIRECTIVE — the user is looking for: "${userPrompt}"
+This query takes top priority. If it specifies a hard constraint (set, rarity, price, card type, theme, etc.), EXCLUDE any card from the pool that does not satisfy it, even if the card would otherwise be excellent for the deck. Strategy notes and deck composition are secondary context for evaluating cards that already meet the query.` : 'User wants general recommendations for what the deck needs most.'}
 
 CANDIDATE POOL (pick ONLY from these cards):
 ${poolSummary}
