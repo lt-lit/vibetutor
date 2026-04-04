@@ -215,44 +215,44 @@ body {
 /* ===== Per-Section Color Coding ===== */
 [data-section="mydecks"] {
   --section-content-bg: #1a1a2e;
-  --section-accent: #8888a0;
-  --section-name-color: #d0d0e0;
+  --section-accent: #a0a0b8;
+  --section-name-color: #e0e0f0;
 }
 
 [data-section="stats"] {
   --section-content-bg: #1a1a2e;
-  --section-accent: #3a4060;
-  --section-name-color: #9aa0bc;
+  --section-accent: #5060a0;
+  --section-name-color: #a0b0e0;
 }
 
 [data-section="deck"] {
   --section-content-bg: #1a1a2e;
-  --section-accent: #38984a;
-  --section-name-color: #50d068;
+  --section-accent: #40c058;
+  --section-name-color: #55f070;
 }
 
 [data-section="considering"] {
   --section-content-bg: #1a1a2e;
-  --section-accent: #9a8230;
-  --section-name-color: #e8c840;
+  --section-accent: #d0a820;
+  --section-name-color: #ffe040;
 }
 
 [data-section="dismissed"] {
   --section-content-bg: #1a1a2e;
-  --section-accent: #a03545;
-  --section-name-color: #e85565;
+  --section-accent: #e03050;
+  --section-name-color: #ff5070;
 }
 
 [data-section="recommendations"] {
   --section-content-bg: #1a1a2e;
-  --section-accent: #7050a0;
-  --section-name-color: #b088e8;
+  --section-accent: #9060d0;
+  --section-name-color: #c098ff;
 }
 
 [data-section="cuts"] {
   --section-content-bg: #1a1a2e;
-  --section-accent: #a06830;
-  --section-name-color: #e89848;
+  --section-accent: #d08030;
+  --section-name-color: #ffaa40;
 }
 
 /* ===== Buttons ===== */
