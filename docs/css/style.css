@@ -1191,28 +1191,20 @@ select.input {
   cursor: pointer;
 }
 
-#recs-results.mobile-two-col,
-#cuts-results.mobile-two-col {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
-}
-
-#recs-results.mobile-two-col .rec-card,
-#cuts-results.mobile-two-col .rec-card {
-  margin-bottom: 0;
+#recs-results.two-col .rec-card,
+#cuts-results.two-col .rec-card {
   flex-direction: row;
   flex-wrap: wrap;
+  align-items: stretch;
 }
 
-#recs-results.mobile-two-col .rec-card .card-image,
-#cuts-results.mobile-two-col .rec-card .card-image {
-  width: 140px;
-  min-width: 140px;
+#recs-results.two-col .rec-card .card-image,
+#cuts-results.two-col .rec-card .card-image {
+  width: 50%;
 }
 
-#recs-results.mobile-two-col .rec-card > .action-buttons,
-#cuts-results.mobile-two-col .rec-card > .action-buttons {
+#recs-results.two-col .rec-card > .action-buttons,
+#cuts-results.two-col .rec-card > .action-buttons {
   width: 100%;
 }
 

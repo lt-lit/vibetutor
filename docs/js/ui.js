@@ -476,9 +476,9 @@ function buildDeckPanel(el, state, handlers) {
     const dismissedEl = document.getElementById('dismissed-panel');
     if (dismissedEl && _dismissedState) updateDismissedDisplay(dismissedEl, _dismissedState);
     const recsResults = document.getElementById('recs-results');
-    if (recsResults) recsResults.classList.toggle('mobile-two-col', mobileDoubleColumn);
+    if (recsResults) recsResults.classList.toggle('two-col', mobileDoubleColumn);
     const cutsResults = document.getElementById('cuts-results');
-    if (cutsResults) cutsResults.classList.toggle('mobile-two-col', mobileDoubleColumn);
+    if (cutsResults) cutsResults.classList.toggle('two-col', mobileDoubleColumn);
   });
 
   // --- Event delegation on cards container ---
@@ -1146,7 +1146,7 @@ function updateRecommendationsDisplay(el, state) {
 
   // Results
   const resultsEl = el.querySelector('#recs-results');
-  resultsEl.classList.toggle('mobile-two-col', mobileDoubleColumn);
+  resultsEl.classList.toggle('two-col', mobileDoubleColumn);
   const suggestBtn = el.querySelector('#recs-suggest-btn');
 
   if (state._recsLoading) {
@@ -1262,7 +1262,7 @@ function buildCutsPanel(el, state, handlers) {
 
 function updateCutsDisplay(el, state) {
   const resultsEl = el.querySelector('#cuts-results');
-  resultsEl.classList.toggle('mobile-two-col', mobileDoubleColumn);
+  resultsEl.classList.toggle('two-col', mobileDoubleColumn);
   const suggestBtn = el.querySelector('#cuts-suggest-btn');
 
   if (state._cutsLoading) {
