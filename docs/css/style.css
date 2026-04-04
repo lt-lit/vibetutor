@@ -213,7 +213,12 @@ body {
 }
 
 /* ===== Per-Section Color Coding ===== */
-[data-section="mydecks"],
+[data-section="mydecks"] {
+  --section-content-bg: #1a1a2e;
+  --section-accent: #8888a0;
+  --section-name-color: #d0d0e0;
+}
+
 [data-section="stats"] {
   --section-content-bg: #1a1a2e;
   --section-accent: #3a4060;
