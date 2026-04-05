@@ -691,11 +691,15 @@ const handlers = {
     if (deckData.cards.length > 0) {
       try {
         const { bulkLookup } = await import('./scryfall.js');
-        const allNames = [
-          ...deckData.cards.map(c => c.name),
-          ...(deckData.considering || []).map(c => c.name),
+        const allIdentifiers = [
+          ...deckData.cards.map(c => c.set && c.collectorNumber
+            ? { name: c.name, set: c.set, collectorNumber: c.collectorNumber }
+            : c.name),
+          ...(deckData.considering || []).map(c => c.set && c.collectorNumber
+            ? { name: c.name, set: c.set, collectorNumber: c.collectorNumber }
+            : c.name),
         ];
-        const results = await bulkLookup(allNames);
+        const results = await bulkLookup(allIdentifiers);
         const cardMap = new Map(results.map(c => [c.name, c]));
 
         const cards = state.cards.map(c => ({

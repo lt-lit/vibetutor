@@ -90,8 +90,16 @@ function slimDeck(state) {
       imageUri: state.commander.imageUris?.normal || state.commander.imageUri || null,
     } : null,
     strategy: state.strategy,
-    cards: state.cards.map(c => ({ name: c.name, tag: c.tag, sources: c.sources })),
-    considering: state.considering.map(c => ({ name: c.name, tag: c.tag })),
+    cards: state.cards.map(c => ({
+      name: c.name, tag: c.tag, sources: c.sources,
+      set: c.scryfallData?.set || undefined,
+      collectorNumber: c.scryfallData?.collectorNumber || undefined,
+    })),
+    considering: state.considering.map(c => ({
+      name: c.name, tag: c.tag,
+      set: c.scryfallData?.set || undefined,
+      collectorNumber: c.scryfallData?.collectorNumber || undefined,
+    })),
     skippedRecommendations: state.skippedRecommendations.map(c =>
       typeof c === 'string' ? c : c.name
     ),
