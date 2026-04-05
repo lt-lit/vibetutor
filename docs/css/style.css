@@ -921,7 +921,7 @@ select.input {
 
 .card-stack-item .stack-item-overlay {
   position: absolute;
-  top: 11%;
+  top: 12%;
   right: 9%;
   width: 13%;
   aspect-ratio: 1;
@@ -997,7 +997,7 @@ select.input {
 
 .deck-grid-item .grid-item-overlay {
   position: absolute;
-  top: 11%;
+  top: 12%;
   right: 9%;
   width: 13%;
   aspect-ratio: 1;
