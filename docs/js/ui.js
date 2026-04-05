@@ -8,7 +8,7 @@ import { exportPlain, exportMoxfield, exportArena } from './export.js';
 
 // Deselect expanded cards when clicking outside
 document.addEventListener('click', (e) => {
-  if (e.target.closest('.card-stack-item') || e.target.closest('.card-options-menu')) return;
+  if (e.target.closest('.card-stack-item') || e.target.closest('.card-options-menu') || e.target.closest('#card-overlay')) return;
   document.querySelectorAll('.card-stack-item.expanded').forEach(c => c.classList.remove('expanded'));
 });
 
