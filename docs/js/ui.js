@@ -585,7 +585,7 @@ function renderStackGroup({ label, cards }, options = {}) {
             <div class="card-stack-item" data-card="${escapeAttr(c.name)}">
               <img src="${imgUrl}" alt="${escapeAttr(c.name)}" loading="lazy">
               <div class="stack-item-overlay">
-                <button class="card-options-btn" data-card="${escapeAttr(c.name)}">&#8942;</button>
+                <button class="card-options-btn" data-card="${escapeAttr(c.name)}">&#9881;</button>
               </div>
             </div>`;
         }).join('')}
@@ -610,7 +610,7 @@ function renderGridGroup({ label, cards }, options = {}) {
             <div class="deck-grid-item" data-card="${escapeAttr(c.name)}">
               <img src="${imgUrl}" alt="${escapeAttr(c.name)}" loading="lazy">
               <div class="grid-item-overlay">
-                <button class="card-options-btn" data-card="${escapeAttr(c.name)}">&#8942;</button>
+                <button class="card-options-btn" data-card="${escapeAttr(c.name)}">&#9881;</button>
               </div>
             </div>`;
         }).join('')}
