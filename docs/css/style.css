@@ -883,6 +883,7 @@ select.input {
   overflow: hidden;
   cursor: pointer;
   transition: box-shadow var(--transition-fast);
+  container-type: inline-size;
 }
 
 .card-stack-item:not(:last-child) {
@@ -921,9 +922,9 @@ select.input {
 
 .card-stack-item .stack-item-overlay {
   position: absolute;
-  top: 12%;
-  right: 10%;
-  width: 8%;
+  top: 13%;
+  right: 7%;
+  width: 10%;
   aspect-ratio: 1;
   opacity: 0;
   transition: opacity var(--transition-fast);
@@ -945,7 +946,7 @@ select.input {
   border: none;
   border-radius: 50%;
   cursor: pointer;
-  font-size: inherit;
+  font-size: 5cqi;
   line-height: 1;
   transition: background var(--transition-fast);
 }
@@ -981,6 +982,7 @@ select.input {
 .deck-grid-item {
   position: relative;
   cursor: pointer;
+  container-type: inline-size;
 }
 
 .deck-grid-item img {
@@ -991,9 +993,9 @@ select.input {
 
 .deck-grid-item .grid-item-overlay {
   position: absolute;
-  top: 12%;
-  right: 10%;
-  width: 8%;
+  top: 13%;
+  right: 7%;
+  width: 10%;
   aspect-ratio: 1;
   opacity: 0;
   transition: opacity var(--transition-fast);
