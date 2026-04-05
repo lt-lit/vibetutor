@@ -950,7 +950,6 @@ select.input {
   border: none;
   border-radius: 50%;
   cursor: pointer;
-  font-size: 5cqi;
   line-height: 1;
   transition: background var(--transition-fast);
 }
