@@ -10,7 +10,7 @@
  */
 
 import { fetchLLM } from './api.js';
-import { searchCards, lookupCard, bulkLookup, fuzzyLookup } from './scryfall.js';
+import { searchCards, bulkLookup, fuzzyLookup } from './scryfall.js';
 import { findCombos } from './spellbook.js';
 
 // ============================================================

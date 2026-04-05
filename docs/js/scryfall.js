@@ -181,17 +181,17 @@ export async function fuzzyLookup(names) {
 
   // Step 3: quoted-phrase search for each miss
   const fuzzyResults = [];
+  const resolvedMisses = new Set();
   for (const name of misses) {
     const results = await searchCards(`"${name}"`);
     if (results.length > 0) {
       fuzzyResults.push(results[0]);
-      foundNames.add(results[0].name);
+      resolvedMisses.add(name);
     }
   }
 
   // Failures: misses that fuzzy search also couldn't resolve
-  const allFoundNames = new Set([...exactResults, ...fuzzyResults].map(c => c.name));
-  const failures = names.filter(n => !allFoundNames.has(n));
+  const failures = misses.filter(n => !resolvedMisses.has(n));
 
   return {
     found: [...exactResults, ...fuzzyResults],
