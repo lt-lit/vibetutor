@@ -73,6 +73,33 @@ export async function searchCards(query) {
 }
 
 /**
+ * Search cards with status info instead of silently returning [].
+ * Used by the diagnostics pipeline so B1 can see what went wrong.
+ * @param {string} query — Scryfall search syntax
+ * @returns {Promise<{cards: Array, error: string|null}>}
+ */
+export async function searchCardsWithStatus(query) {
+  const cacheKey = `search:${query}`;
+  if (cache.has(cacheKey)) return { cards: cache.get(cacheKey), error: null };
+
+  try {
+    const resp = await rateLimitedFetch(
+      `${API_BASE}/cards/search?q=${encodeURIComponent(query)}&order=edhrec`
+    );
+    if (!resp.ok) {
+      const body = await resp.json().catch(() => ({}));
+      return { cards: [], error: `HTTP ${resp.status}: ${body.details || resp.statusText}` };
+    }
+    const data = await resp.json();
+    const cards = (data.data || []).map(parseCard);
+    cache.set(cacheKey, cards);
+    return { cards, error: null };
+  } catch (e) {
+    return { cards: [], error: e.message };
+  }
+}
+
+/**
  * Look up a card by exact name.
  * @param {string} name
  * @returns {Promise<object|null>}
@@ -160,6 +187,43 @@ export async function autocomplete(input) {
     console.warn('Scryfall autocomplete failed:', e.message);
     return [];
   }
+}
+
+/**
+ * Fuzzy lookup: validates brainstormed card names that may not be exact.
+ * First tries bulkLookup for exact matches, then falls back to quoted-phrase
+ * search for misses (e.g. "Sandy Cheeks" → "Sandy Cheeks, Martial Astronaut").
+ * @param {Array<string>} names — card names to validate
+ * @returns {Promise<{found: Array<object>, failures: Array<string>}>}
+ */
+export async function fuzzyLookup(names) {
+  if (names.length === 0) return { found: [], failures: [] };
+
+  // Step 1: batch exact match
+  const exactResults = await bulkLookup(names);
+  const foundNames = new Set(exactResults.map(c => c.name));
+
+  // Step 2: identify misses
+  const misses = names.filter(n => !foundNames.has(n));
+
+  // Step 3: quoted-phrase search for each miss
+  const fuzzyResults = [];
+  for (const name of misses) {
+    const results = await searchCards(`"${name}"`);
+    if (results.length > 0) {
+      fuzzyResults.push(results[0]);
+      foundNames.add(results[0].name);
+    }
+  }
+
+  // Failures: misses that fuzzy search also couldn't resolve
+  const allFoundNames = new Set([...exactResults, ...fuzzyResults].map(c => c.name));
+  const failures = names.filter(n => !allFoundNames.has(n));
+
+  return {
+    found: [...exactResults, ...fuzzyResults],
+    failures,
+  };
 }
 
 /**

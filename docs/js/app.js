@@ -346,20 +346,14 @@ const handlers = {
     try {
       const { suggestRecommendations } = await import('./engine.js');
 
-      // Update loading status as the engine progresses
-      setTimeout(() => {
-        if (state._recsLoading) updateState({ _recsLoading: true, _recsLoadingStatus: 'Searching 3 sources...' });
-      }, 3000);
-      setTimeout(() => {
-        if (state._recsLoading) updateState({ _recsLoading: true, _recsLoadingStatus: 'AI is choosing cards...' });
-      }, 7000);
-
-      const results = await suggestRecommendations(state, prompt);
+      const results = await suggestRecommendations(state, prompt, (status) => {
+        if (state._recsLoading) updateState({ _recsLoading: true, _recsLoadingStatus: status });
+      });
       updateState({
         recommendationsResults: results,
         _recsLoading: false,
         _recsLoadingStatus: null,
-        iterationCount: state.iterationCount + 2,
+        iterationCount: state.iterationCount + 5,
       });
     } catch (e) {
       updateState({
