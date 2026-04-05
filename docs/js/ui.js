@@ -115,7 +115,7 @@ function buildMyDecksPanel(el, state, decks, handlers) {
 function updateMyDecksDisplay(el, state, decks) {
   const listEl = el.querySelector('#mydecks-list');
   if (!listEl) return;
-  listEl.classList.toggle('two-col', mobileDoubleColumn);
+  listEl.classList.add('two-col');
 
   if (decks.length === 0) {
     listEl.innerHTML = '<p class="field-hint" style="margin-top:12px">No saved decks yet. Select a commander to start your first deck.</p>';
@@ -237,7 +237,6 @@ function saveViewPrefs() {
     viewMode: deckViewMode,
     grouping: deckGrouping,
     sorting: deckSorting,
-    twoCols: mobileDoubleColumn,
   }));
 }
 
@@ -247,7 +246,6 @@ let deckGrouping = prefs?.grouping || 'tag';
 let deckSorting = prefs?.sorting || 'cmc';
 const collapsedGroups = new Set();
 
-let mobileDoubleColumn = prefs?.twoCols ?? true;
 
 /** Stored handlers reference for event delegation */
 let _deckHandlers = null;
@@ -312,10 +310,6 @@ function buildDeckPanel(el, state, handlers) {
           <div class="segmented-control deck-sorting-toggle" id="deck-sorting-toggle">
             <button data-sort="cmc" class="${deckSorting === 'cmc' ? 'active' : ''}">CMC</button>
             <button data-sort="az" class="${deckSorting === 'az' ? 'active' : ''}">A-Z</button>
-          </div>
-          <div class="segmented-control deck-cols-toggle deck-mobile-cols-btn" id="deck-cols-toggle">
-            <button data-cols="1" class="${!mobileDoubleColumn ? 'active' : ''}">1-Col</button>
-            <button data-cols="2" class="${mobileDoubleColumn ? 'active' : ''}">2-Col</button>
           </div>
           <button class="btn btn-sm" id="deck-import-btn">Import</button>
           <div class="relative">
@@ -476,30 +470,6 @@ function buildDeckPanel(el, state, handlers) {
     }
   });
 
-  // --- Mobile column toggle ---
-  el.querySelector('#deck-cols-toggle').addEventListener('click', (e) => {
-    const btn = e.target.closest('button[data-cols]');
-    if (!btn) return;
-    mobileDoubleColumn = btn.dataset.cols === '2';
-    saveViewPrefs();
-    el.querySelectorAll('#deck-cols-toggle button').forEach(b =>
-      b.classList.toggle('active', b.dataset.cols === btn.dataset.cols));
-    const cardsEl = el.querySelector('#deck-cards');
-    cardsEl.classList.toggle('mobile-two-col', mobileDoubleColumn);
-    const cmdArea = el.querySelector('.commander-with-strategy');
-    if (cmdArea) cmdArea.classList.toggle('two-col', mobileDoubleColumn);
-    // Also update considering, dismissed, recs, and cuts panels
-    const consideringEl = document.getElementById('considering-panel');
-    if (consideringEl && _consideringState) updateConsideringDisplay(consideringEl, _consideringState);
-    const dismissedEl = document.getElementById('dismissed-panel');
-    if (dismissedEl && _dismissedState) updateDismissedDisplay(dismissedEl, _dismissedState);
-    const recsResults = document.getElementById('recs-results');
-    if (recsResults) recsResults.classList.toggle('two-col', mobileDoubleColumn);
-    const cutsResults = document.getElementById('cuts-results');
-    if (cutsResults) cutsResults.classList.toggle('two-col', mobileDoubleColumn);
-    const mydecksList = document.getElementById('mydecks-list');
-    if (mydecksList) mydecksList.classList.toggle('two-col', mobileDoubleColumn);
-  });
 
   // --- Event delegation on cards container ---
   el.querySelector('#deck-cards').addEventListener('click', (e) => {
@@ -576,7 +546,7 @@ function updateDeckDisplay(el, state) {
 
   // Sync commander layout with column toggle
   const cmdArea = el.querySelector('.commander-with-strategy');
-  if (cmdArea) cmdArea.classList.toggle('two-col', mobileDoubleColumn);
+  if (cmdArea) cmdArea.classList.add('two-col');
 
   // Update cards display
   const cardsEl = el.querySelector('#deck-cards');
@@ -595,10 +565,7 @@ function updateDeckDisplay(el, state) {
     cardsEl.innerHTML = groups.map(g => renderGridGroup(g)).join('');
   }
 
-  // Re-apply mobile 2-column class if active
-  if (mobileDoubleColumn) {
-    cardsEl.classList.add('mobile-two-col');
-  }
+  cardsEl.classList.add('mobile-two-col');
 }
 
 function renderStackGroup({ label, cards }, options = {}) {
@@ -983,7 +950,7 @@ async function openPrintingSelector(cardName) {
   loadingEl.remove();
 
   const listEl = document.createElement('div');
-  listEl.className = `printing-list${mobileDoubleColumn ? ' two-col' : ''}`;
+  listEl.className = 'printing-list two-col';
   modal.appendChild(listEl);
 
   const visibleCount = Math.min(PRINTING_PAGE_SIZE, printings.length);
@@ -1263,7 +1230,7 @@ function updateRecommendationsDisplay(el, state) {
 
   // Results
   const resultsEl = el.querySelector('#recs-results');
-  resultsEl.classList.toggle('two-col', mobileDoubleColumn);
+  resultsEl.classList.add('two-col');
   const suggestBtn = el.querySelector('#recs-suggest-btn');
 
   if (state._recsLoading) {
@@ -1379,7 +1346,7 @@ function buildCutsPanel(el, state, handlers) {
 
 function updateCutsDisplay(el, state) {
   const resultsEl = el.querySelector('#cuts-results');
-  resultsEl.classList.toggle('two-col', mobileDoubleColumn);
+  resultsEl.classList.add('two-col');
   const suggestBtn = el.querySelector('#cuts-suggest-btn');
 
   if (state._cutsLoading) {
@@ -1525,11 +1492,7 @@ function updateConsideringDisplay(el, state) {
     cardsEl.innerHTML = groups.map(g => renderGridGroup(g, renderOpts)).join('');
   }
 
-  if (mobileDoubleColumn) {
-    cardsEl.classList.add('mobile-two-col');
-  } else {
-    cardsEl.classList.remove('mobile-two-col');
-  }
+  cardsEl.classList.add('mobile-two-col');
 }
 
 // ============================================================
@@ -1632,11 +1595,7 @@ function updateDismissedDisplay(el, state) {
     cardsEl.innerHTML = groups.map(g => renderGridGroup(g, renderOpts)).join('');
   }
 
-  if (mobileDoubleColumn) {
-    cardsEl.classList.add('mobile-two-col');
-  } else {
-    cardsEl.classList.remove('mobile-two-col');
-  }
+  cardsEl.classList.add('mobile-two-col');
 }
 
 function openDismissedOptionsMenu(anchorEl, cardName) {
