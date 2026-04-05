@@ -6,6 +6,12 @@
 import { searchCards, autocomplete, lookupCard, bulkLookup, parseDecklistText, fetchAllPrintings } from './scryfall.js';
 import { exportPlain, exportMoxfield, exportArena } from './export.js';
 
+// Deselect expanded cards when clicking outside
+document.addEventListener('click', (e) => {
+  if (e.target.closest('.card-stack-item') || e.target.closest('.card-options-menu')) return;
+  document.querySelectorAll('.card-stack-item.expanded').forEach(c => c.classList.remove('expanded'));
+});
+
 /** Track which panels have been initialized to avoid re-rendering on every state change */
 const initialized = new Set();
 
