@@ -353,7 +353,7 @@ const handlers = {
         recommendationsResults: results,
         _recsLoading: false,
         _recsLoadingStatus: null,
-        iterationCount: state.iterationCount + 5,
+        iterationCount: state.iterationCount + 3,
       });
     } catch (e) {
       updateState({

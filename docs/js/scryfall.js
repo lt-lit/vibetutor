@@ -73,33 +73,6 @@ export async function searchCards(query) {
 }
 
 /**
- * Search cards with status info instead of silently returning [].
- * Used by the diagnostics pipeline so B1 can see what went wrong.
- * @param {string} query — Scryfall search syntax
- * @returns {Promise<{cards: Array, error: string|null}>}
- */
-export async function searchCardsWithStatus(query) {
-  const cacheKey = `search:${query}`;
-  if (cache.has(cacheKey)) return { cards: cache.get(cacheKey), error: null };
-
-  try {
-    const resp = await rateLimitedFetch(
-      `${API_BASE}/cards/search?q=${encodeURIComponent(query)}&order=edhrec`
-    );
-    if (!resp.ok) {
-      const body = await resp.json().catch(() => ({}));
-      return { cards: [], error: `HTTP ${resp.status}: ${body.details || resp.statusText}` };
-    }
-    const data = await resp.json();
-    const cards = (data.data || []).map(parseCard);
-    cache.set(cacheKey, cards);
-    return { cards, error: null };
-  } catch (e) {
-    return { cards: [], error: e.message };
-  }
-}
-
-/**
  * Look up a card by exact name.
  * @param {string} name
  * @returns {Promise<object|null>}

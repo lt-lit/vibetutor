@@ -2,16 +2,15 @@
  * engine.js — Multi-source card pool injection engine
  * Orchestrates the AI recommendation and cuts logic.
  *
- * Recommendations use a 3-layer pipeline (5 LLM calls):
+ * Recommendations use a 2-layer pipeline (3 LLM calls):
  *   Layer A (parallel): A1 search-based + A2 knowledge-based discovery
- *   Layer B (parallel): B1 search iteration + B2 gap-fill & prune
  *   Layer C: Final selection — pick ~10 cards with elevator pitches
  *
  * Plus suggestCuts (1 LLM call) and autoTag (1 LLM call).
  */
 
 import { fetchLLM } from './api.js';
-import { searchCards, searchCardsWithStatus, lookupCard, bulkLookup, fuzzyLookup } from './scryfall.js';
+import { searchCards, lookupCard, bulkLookup, fuzzyLookup } from './scryfall.js';
 import { findCombos } from './spellbook.js';
 
 // ============================================================
@@ -54,63 +53,14 @@ RULES:
 
 IMPORTANT: Always respond with valid JSON only. No markdown, no code fences, no extra text.`;
 
-const SYSTEM_PROMPT_B1 = `You are VibeTutor, an expert MTG search strategist reviewing and improving Scryfall search queries.
-
-You are given:
-- The user's original query
-- The Scryfall queries that were attempted in the first search pass, with per-query results (card count and any errors)
-- The current card pool assembled so far
-
-Your job: critique the search strategy and produce improved or entirely new Scryfall queries to fill gaps.
-
-Consider:
-- Queries that returned errors — fix the syntax
-- Queries that returned 0-2 results — probably too narrow, loosen or rethink
-- Queries that returned 100+ generic results — probably too broad, add filters
-- Angles not yet explored (flavor text search with ft:, different type combinations, specific set codes, etc.)
-- Whether the pool already has good coverage for the user's query (if so, fewer new queries needed)
-
-Scryfall syntax:
-ci:wur | t:creature | o:"phrase" | ft:"flavor text" | cmc<=3 | f:commander
-order:edhrec | order:random | OR, AND, -, ()
--t:creature (NOT) | r:rare | c:w (white cards) | s:setcode
-
-RULES:
-1. Always include f:commander and the color identity filter in every query.
-2. Generate 0-4 new queries. If the pool already looks great, return 0.
-3. Focus on angles the first pass missed entirely.
-
-IMPORTANT: Always respond with valid JSON only. No markdown, no code fences, no extra text.`;
-
-const SYSTEM_PROMPT_B2 = `You are VibeTutor, an expert MTG deck building assistant reviewing a card pool for quality and completeness.
-
-You are given:
-- The user's original query
-- The current card pool (assembled from search results and knowledge-based brainstorming)
-- The brainstormed card names from the first pass (which ones were found, which failed validation)
-
-Your TWO jobs:
-
-1. GAP-FILL: Brainstorm additional card names from your knowledge that the pool is missing. Consider what the failed brainstorm names were reaching for — maybe there are similar real cards. Think about angles not yet covered.
-
-2. PRUNE: Identify cards in the pool that clearly do NOT match the user's query and should be removed. Be conservative — only prune cards you're confident are off-theme. When in doubt, keep the card (the final selection step will sort it out).
-
-RULES:
-1. For additions, include brief reasoning so validation failures can inform future iterations.
-2. For removals, include a reason so the logic is transparent.
-3. If the pool already looks great, return empty additions and removals.
-
-IMPORTANT: Always respond with valid JSON only. No markdown, no code fences, no extra text.`;
-
 // ============================================================
-// RECOMMENDATIONS (Three-Layer Pipeline)
+// RECOMMENDATIONS (Two-Layer Pipeline: A1+A2 parallel → C)
 // ============================================================
 
 /**
- * Suggest card recommendations using a 3-layer pipeline.
+ * Suggest card recommendations using a 2-layer pipeline.
  *
  * Layer A (parallel): A1 search-based discovery + A2 knowledge-based brainstorm
- * Layer B (parallel): B1 search iteration + B2 knowledge gap-fill & prune
  * Layer C: Final selection — pick ~10 cards, write elevator pitches
  *
  * @param {object} deckState — full deck state
@@ -137,17 +87,16 @@ export async function suggestRecommendations(deckState, userPrompt, onStatus = (
     }
 
     const [scryfallResult, edhrecResult, spellbookResult] = await Promise.allSettled([
-      fetchScryfallPoolWithDiagnostics(queries.scryfallQueries),
+      fetchScryfallPool(queries.scryfallQueries),
       filterEdhrecPool(deckState.edhrecData, queries.edhrecFilter || ''),
       fetchSpellbookNearMiss(deckState),
     ]);
 
-    const { cards: scryfallCards, diagnostics } = scryfallResult.status === 'fulfilled'
-      ? scryfallResult.value : { cards: [], diagnostics: [] };
+    const scryfallCards = scryfallResult.status === 'fulfilled' ? scryfallResult.value : [];
     const edhrecCards = edhrecResult.status === 'fulfilled' ? edhrecResult.value : [];
     const spellbookCards = spellbookResult.status === 'fulfilled' ? spellbookResult.value : [];
 
-    return { scryfallCards, edhrecCards, spellbookCards, diagnostics };
+    return { scryfallCards, edhrecCards, spellbookCards };
   }
 
   // A2: Knowledge-based brainstorm
@@ -156,15 +105,12 @@ export async function suggestRecommendations(deckState, userPrompt, onStatus = (
     const brainstormResponse = await callLLM(model, SYSTEM_PROMPT_A2, brainstormPrompt);
     const brainstorm = parseJSON(brainstormResponse);
 
-    if (!brainstorm?.cards?.length) {
-      return { found: [], failures: [], originalBrainstorm: [] };
-    }
+    if (!brainstorm?.cards?.length) return [];
 
     const names = brainstorm.cards.map(c => c.name);
-    const { found, failures } = await fuzzyLookup(names);
+    const { found } = await fuzzyLookup(names);
 
-    // Convert found cards to pool card format
-    const poolCards = found.map(c => ({
+    return found.map(c => ({
       name: c.name,
       scryfallData: c,
       sources: ['brainstorm'],
@@ -174,8 +120,6 @@ export async function suggestRecommendations(deckState, userPrompt, onStatus = (
       combosUnlocked: [],
       comboDescription: '',
     }));
-
-    return { found: poolCards, failures, originalBrainstorm: brainstorm.cards };
   }
 
   const [a1Result, a2Result] = await Promise.allSettled([runA1(), runA2()]);
@@ -186,90 +130,18 @@ export async function suggestRecommendations(deckState, userPrompt, onStatus = (
   }
 
   const a1 = a1Result.value;
-  const a2 = a2Result.status === 'fulfilled'
-    ? a2Result.value
-    : { found: [], failures: [], originalBrainstorm: [] };
+  const a2Cards = a2Result.status === 'fulfilled' ? a2Result.value : [];
 
-  // Merge Layer A results into pool
-  const poolMap = new Map();
-  const initialPool = mergeCardPool(a1.scryfallCards, a1.edhrecCards, a1.spellbookCards, deckState);
-  for (const card of initialPool) {
-    poolMap.set(card.name, card);
-  }
-  mergeIntoPool(poolMap, a2.found, deckState);
+  // Merge all sources into a single pool
+  const pool = mergeCardPool(
+    [...a1.scryfallCards, ...a2Cards],
+    a1.edhrecCards,
+    a1.spellbookCards,
+    deckState,
+  );
 
-  if (poolMap.size === 0) {
+  if (pool.length === 0) {
     throw new Error('No cards found. Try a different prompt.');
-  }
-
-  // ============================================================
-  // LAYER B — Pool Refinement (parallel: B1 search iteration + B2 gap-fill & prune)
-  // ============================================================
-  onStatus('Refining search results...');
-
-  const poolArray = () => [...poolMap.values()];
-
-  // B1: Search iteration — critique and improve A1's queries
-  async function runB1() {
-    const pool = poolArray();
-    const prompt = buildSearchIterationPrompt(userPrompt, pool, a1.diagnostics, deckState);
-    const response = await callLLM(model, SYSTEM_PROMPT_B1, prompt);
-    const result = parseJSON(response);
-
-    if (!result?.scryfallQueries?.length) return { newCards: [] };
-
-    // Cap at 4 queries to bound latency
-    const queries = result.scryfallQueries.slice(0, 4);
-    const { cards } = await fetchScryfallPoolWithDiagnostics(queries);
-    return { newCards: cards };
-  }
-
-  // B2: Knowledge gap-fill + prune
-  async function runB2() {
-    const pool = poolArray();
-    const prompt = buildGapFillPrompt(userPrompt, pool, a2, deckState);
-    const response = await callLLM(model, SYSTEM_PROMPT_B2, prompt);
-    const result = parseJSON(response);
-
-    let newCards = [];
-    if (result?.additions?.length) {
-      const names = result.additions.map(a => a.name).slice(0, 15);
-      const { found } = await fuzzyLookup(names);
-      newCards = found.map(c => ({
-        name: c.name,
-        scryfallData: c,
-        sources: ['brainstorm'],
-        edhrecSynergy: null,
-        edhrecInclusion: null,
-        salt: null,
-        combosUnlocked: [],
-        comboDescription: '',
-      }));
-    }
-
-    const removals = (result?.removals || []).map(r => r.name);
-    return { newCards, removals };
-  }
-
-  const [b1Result, b2Result] = await Promise.allSettled([runB1(), runB2()]);
-
-  // Both B1 and B2 are optional — proceed with existing pool if either fails
-  if (b1Result.status === 'fulfilled' && b1Result.value.newCards.length > 0) {
-    mergeIntoPool(poolMap, b1Result.value.newCards, deckState);
-  }
-  if (b2Result.status === 'fulfilled') {
-    if (b2Result.value.newCards.length > 0) {
-      mergeIntoPool(poolMap, b2Result.value.newCards, deckState);
-    }
-    // Apply prune list
-    for (const name of b2Result.value.removals) {
-      poolMap.delete(name);
-    }
-  }
-
-  const finalPool = poolArray();
-  if (finalPool.length === 0) {
-    throw new Error('No cards remained after refinement. Try a different prompt.');
   }
 
   // ============================================================
@@ -277,7 +149,7 @@ export async function suggestRecommendations(deckState, userPrompt, onStatus = (
   // ============================================================
   onStatus('AI is selecting the best cards...');
 
-  const selectionPrompt = buildSelectionPrompt(deckState, userPrompt, finalPool);
+  const selectionPrompt = buildSelectionPrompt(deckState, userPrompt, pool);
   const selectionResponse = await callLLM(model, SYSTEM_PROMPT, selectionPrompt);
   const selection = parseJSON(selectionResponse);
 
@@ -286,11 +158,11 @@ export async function suggestRecommendations(deckState, userPrompt, onStatus = (
   }
 
   // Validate card names against pool
-  const poolNames = new Set(finalPool.map(c => c.name));
+  const poolNames = new Set(pool.map(c => c.name));
   const validated = selection.cards
     .filter(c => poolNames.has(c.name))
     .map(c => {
-      const poolCard = finalPool.find(p => p.name === c.name);
+      const poolCard = pool.find(p => p.name === c.name);
       return {
         name: c.name,
         tag: c.tag || null,
@@ -579,80 +451,6 @@ Respond with JSON:
 }`;
 }
 
-function buildSearchIterationPrompt(userPrompt, pool, a1Diagnostics, deckState) {
-  const commander = deckState.commander;
-  const ci = commander?.colorIdentity?.join('') || '';
-
-  const diagnosticsSummary = a1Diagnostics.map(d =>
-    `  Query: ${d.query} → ${d.error ? `ERROR: ${d.error}` : `${d.cardCount} cards found`}`
-  ).join('\n');
-
-  const poolSummary = pool.map(c =>
-    `${c.name} — ${c.scryfallData?.typeLine || '?'} [${c.sources.join(', ')}]`
-  ).join('\n');
-
-  return `USER QUERY: "${userPrompt || 'general recommendations'}"
-Commander: ${commander?.name || 'Unknown'} (color identity: ${ci})
-
-FIRST-PASS SEARCH DIAGNOSTICS:
-${diagnosticsSummary}
-
-CURRENT POOL (${pool.length} cards):
-${poolSummary}
-
-Review the search strategy above. Are there errors to fix? Queries that were too narrow or too broad? Angles not yet explored (flavor text, specific sets, different card types)?
-
-Generate 0-4 improved or new Scryfall queries. Always include f:commander and ci:${ci || 'c'}.
-If the pool already has strong coverage for the user's query, return an empty array.
-
-Respond with JSON:
-{
-  "type": "search-iteration",
-  "reasoning": "what you're fixing or exploring",
-  "scryfallQueries": ["query1 f:commander ci:${ci || 'c'}", ...]
-}`;
-}
-
-function buildGapFillPrompt(userPrompt, pool, a2Results, deckState) {
-  const commander = deckState.commander;
-  const ci = commander?.colorIdentity?.join('') || '';
-
-  const poolSummary = pool.map(c =>
-    `${c.name} — ${c.scryfallData?.typeLine || '?'} [${c.sources.join(', ')}]`
-  ).join('\n');
-
-  const brainstormSummary = a2Results.originalBrainstorm.map(b => {
-    const found = !a2Results.failures.includes(b.name);
-    return `  ${b.name} — ${found ? 'FOUND' : 'NOT FOUND'} (reasoning: ${b.reasoning})`;
-  }).join('\n');
-
-  return `USER QUERY: "${userPrompt || 'general recommendations'}"
-Commander: ${commander?.name || 'Unknown'} (color identity: ${ci})
-
-CURRENT POOL (${pool.length} cards):
-${poolSummary}
-
-FIRST-PASS BRAINSTORM RESULTS:
-${brainstormSummary}
-
-TWO TASKS:
-
-1. GAP-FILL: Brainstorm up to 15 additional card names from your knowledge that the pool is missing. Look at what the failed brainstorm names were reaching for — maybe similar real cards exist. Consider angles not yet covered.
-
-2. PRUNE: List any cards currently in the pool that clearly do NOT match the user's query "${userPrompt || 'general recommendations'}". Be conservative — only prune cards you're confident are off-theme.
-
-Respond with JSON:
-{
-  "type": "gap-fill",
-  "additions": [
-    {"name": "Exact Card Name", "reasoning": "why this matches the query"}
-  ],
-  "removals": [
-    {"name": "Exact Card Name", "reason": "why this doesn't match the query"}
-  ]
-}`;
-}
-
 // ============================================================
 // DATA FETCHING HELPERS
 // ============================================================
@@ -678,34 +476,6 @@ async function fetchScryfallPool(queries) {
     combosUnlocked: [],
     comboDescription: '',
   }));
-}
-
-/**
- * Run multiple Scryfall queries with per-query diagnostics.
- * Returns both the card pool and diagnostics for B1 to review.
- */
-async function fetchScryfallPoolWithDiagnostics(queries) {
-  const diagnostics = [];
-  const cards = [];
-
-  for (const q of queries) {
-    const { cards: found, error } = await searchCardsWithStatus(q);
-    diagnostics.push({ query: q, cardCount: found.length, error });
-    for (const c of found) {
-      cards.push({
-        name: c.name,
-        scryfallData: c,
-        sources: ['scryfall'],
-        edhrecSynergy: null,
-        edhrecInclusion: null,
-        salt: null,
-        combosUnlocked: [],
-        comboDescription: '',
-      });
-    }
-  }
-
-  return { cards, diagnostics };
 }
 
 /**
@@ -787,38 +557,6 @@ function mergeCardPool(scryfallCards, edhrecCards, spellbookCards, deckState) {
   }
 
   return [...merged.values()];
-}
-
-/**
- * Merge new cards into an existing pool Map. Applies dedup and deck/skipped/considering exclusion.
- * Mutates the pool Map in place.
- * @param {Map<string, object>} pool — existing pool keyed by card name
- * @param {Array<object>} newCards — new pool cards to merge in
- * @param {object} deckState — for exclusion lists
- */
-function mergeIntoPool(pool, newCards, deckState) {
-  const deckNames = new Set(deckState.cards.map(c => c.name));
-  const skippedNames = new Set((deckState.skippedRecommendations || []).map(c => c.name || c));
-  const consideringNames = new Set((deckState.considering || []).map(c => c.name || c));
-
-  for (const card of newCards) {
-    if (deckNames.has(card.name) || skippedNames.has(card.name) || consideringNames.has(card.name)) continue;
-
-    if (pool.has(card.name)) {
-      const existing = pool.get(card.name);
-      for (const s of card.sources) {
-        if (!existing.sources.includes(s)) existing.sources.push(s);
-      }
-      if (card.edhrecSynergy != null) existing.edhrecSynergy = card.edhrecSynergy;
-      if (card.edhrecInclusion != null) existing.edhrecInclusion = card.edhrecInclusion;
-      if (card.salt != null) existing.salt = card.salt;
-      if (card.combosUnlocked.length > 0) existing.combosUnlocked = card.combosUnlocked;
-      if (card.comboDescription) existing.comboDescription = card.comboDescription;
-      if (card.scryfallData && !existing.scryfallData) existing.scryfallData = card.scryfallData;
-    } else {
-      pool.set(card.name, { ...card });
-    }
-  }
 }
 
 // ============================================================
