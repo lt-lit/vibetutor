@@ -157,6 +157,54 @@ export async function autocomplete(input) {
 }
 
 /**
+ * Parse a raw Scryfall card into a printing summary for the printing selector.
+ */
+function parsePrinting(raw) {
+  const face = raw.card_faces?.[0] || raw;
+  return {
+    scryfallData: parseCard(raw),
+    setName: raw.set_name || '',
+    setCode: (raw.set || '').toUpperCase(),
+    collectorNumber: raw.collector_number || '',
+    rarity: raw.rarity || '',
+    year: (raw.released_at || '').slice(0, 4),
+    priceUsd: raw.prices?.usd || null,
+    priceFoil: raw.prices?.usd_foil || null,
+    imageNormal: (raw.image_uris || face.image_uris || {}).normal || '',
+  };
+}
+
+/**
+ * Fetch all printings of a card by exact name.
+ * @param {string} cardName
+ * @returns {Promise<Array<object>>}
+ */
+export async function fetchAllPrintings(cardName) {
+  const cacheKey = `printings:${cardName.toLowerCase()}`;
+  if (cache.has(cacheKey)) return cache.get(cacheKey);
+
+  const results = [];
+  let url = `${API_BASE}/cards/search?q=${encodeURIComponent('!"' + cardName + '"')}+unique%3Aprints&order=released`;
+
+  try {
+    while (url) {
+      const resp = await rateLimitedFetch(url);
+      if (!resp.ok) break;
+      const data = await resp.json();
+      for (const raw of (data.data || [])) {
+        results.push(parsePrinting(raw));
+      }
+      url = data.has_more ? data.next_page : null;
+    }
+  } catch (e) {
+    console.warn('Scryfall fetchAllPrintings failed:', e.message);
+  }
+
+  cache.set(cacheKey, results);
+  return results;
+}
+
+/**
  * Parse a Scryfall card object into our simplified format.
  * @param {object} raw
  * @returns {object}
@@ -180,6 +228,9 @@ function parseCard(raw) {
     },
     prices: raw.prices || {},
     set: raw.set || '',
+    setName: raw.set_name || '',
+    rarity: raw.rarity || '',
+    artist: face.artist || raw.artist || '',
     collectorNumber: raw.collector_number || '',
     scryfallId: raw.id || '',
     legalities: raw.legalities || {},
