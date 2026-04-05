@@ -97,7 +97,7 @@ export async function lookupCard(name) {
 
 /**
  * Bulk lookup cards via POST /cards/collection.
- * @param {Array<string>} names — card name list
+ * @param {Array<string|{name:string, set?:string, collectorNumber?:string}>} names — card identifiers (names or objects with printing info)
  * @returns {Promise<Array>} — found cards
  */
 export async function bulkLookup(names) {
@@ -116,7 +116,13 @@ export async function bulkLookup(names) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          identifiers: batch.map(name => ({ name })),
+          identifiers: batch.map(item => {
+            if (typeof item === 'object' && item.set && item.collectorNumber) {
+              return { set: item.set, collector_number: item.collectorNumber };
+            }
+            const name = typeof item === 'string' ? item : item.name;
+            return { name };
+          }),
         }),
       });
       if (resp.ok) {
