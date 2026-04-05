@@ -921,8 +921,8 @@ select.input {
 
 .card-stack-item .stack-item-overlay {
   position: absolute;
-  bottom: 4px;
-  left: 4px;
+  top: 10%;
+  right: 4px;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -992,7 +992,7 @@ select.input {
 
 .deck-grid-item .grid-item-overlay {
   position: absolute;
-  top: 4px;
+  top: 10%;
   right: 4px;
   display: flex;
   align-items: center;
