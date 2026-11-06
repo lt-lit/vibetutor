@@ -163,6 +163,43 @@ export async function autocomplete(input) {
 }
 
 /**
+ * Fuzzy lookup: validates brainstormed card names that may not be exact.
+ * First tries bulkLookup for exact matches, then falls back to quoted-phrase
+ * search for misses (e.g. "Sandy Cheeks" → "Sandy Cheeks, Martial Astronaut").
+ * @param {Array<string>} names — card names to validate
+ * @returns {Promise<{found: Array<object>, failures: Array<string>}>}
+ */
+export async function fuzzyLookup(names) {
+  if (names.length === 0) return { found: [], failures: [] };
+
+  // Step 1: batch exact match
+  const exactResults = await bulkLookup(names);
+  const foundNames = new Set(exactResults.map(c => c.name));
+
+  // Step 2: identify misses
+  const misses = names.filter(n => !foundNames.has(n));
+
+  // Step 3: quoted-phrase search for each miss
+  const fuzzyResults = [];
+  const resolvedMisses = new Set();
+  for (const name of misses) {
+    const results = await searchCards(`"${name}"`);
+    if (results.length > 0) {
+      fuzzyResults.push(results[0]);
+      resolvedMisses.add(name);
+    }
+  }
+
+  // Failures: misses that fuzzy search also couldn't resolve
+  const failures = misses.filter(n => !resolvedMisses.has(n));
+
+  return {
+    found: [...exactResults, ...fuzzyResults],
+    failures,
+  };
+}
+
+/**
  * Parse a raw Scryfall card into a printing summary for the printing selector.
  */
 function parsePrinting(raw) {

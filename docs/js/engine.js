@@ -2,12 +2,15 @@
  * engine.js — Multi-source card pool injection engine
  * Orchestrates the AI recommendation and cuts logic.
  *
- * Two exported functions for recommendations (2 LLM calls) and cuts (1 LLM call).
- * Plus autoTag for bulk-tagging the deck.
+ * Recommendations use a 2-layer pipeline (3 LLM calls):
+ *   Layer A (parallel): A1 search-based + A2 knowledge-based discovery
+ *   Layer C: Final selection — pick ~10 cards with elevator pitches
+ *
+ * Plus suggestCuts (1 LLM call) and autoTag (1 LLM call).
  */
 
 import { fetchLLM } from './api.js';
-import { searchCards, lookupCard, bulkLookup } from './scryfall.js';
+import { searchCards, bulkLookup, fuzzyLookup } from './scryfall.js';
 import { findCombos } from './spellbook.js';
 
 // ============================================================
@@ -31,56 +34,126 @@ order:edhrec | order:random | OR, AND, -, ()
 
 IMPORTANT: Always respond with valid JSON only. No markdown, no code fences, no extra text.`;
 
+const SYSTEM_PROMPT_A2 = `You are VibeTutor, an expert MTG Commander/EDH deck building assistant with encyclopedic knowledge of every Magic: The Gathering card ever printed.
+
+Your job: brainstorm real Magic card names that match a user's query. Think laterally and creatively:
+- Characters, flavor, and lore connections (e.g. "Texas themed" → Sandy Cheeks, Martial Astronaut because Sandy is from Texas)
+- Universes Beyond and Secret Lair crossovers
+- Art and visual themes
+- Mechanical flavor (cards that FEEL like the theme even if not literally about it)
+- Alternate printings and special editions
+- Cultural references and real-world connections
+
+RULES:
+1. Only suggest card names you are confident actually exist. If unsure, include it anyway — validation will filter out mistakes.
+2. Think broadly. Go beyond the obvious. The user wants deep, surprising finds.
+3. Consider cards from ALL sets, including supplemental products, Secret Lair, Universes Beyond, Un-sets, etc.
+4. Include a brief reasoning for each card so the refinement step can evaluate your logic.
+5. If a budget cap is set, try to avoid suggesting cards you know to be very expensive.
+
+IMPORTANT: Always respond with valid JSON only. No markdown, no code fences, no extra text.`;
+
 // ============================================================
-// RECOMMENDATIONS (Two-Call Pattern)
+// RECOMMENDATIONS (Two-Layer Pipeline: A1+A2 parallel → C)
 // ============================================================
 
 /**
- * Suggest card recommendations.
- * Call 1: LLM composes Scryfall queries + EDHREC filter
- * Parallel: fetch from Scryfall, EDHREC, Spellbook
- * Call 2: LLM picks 3-5 cards from the merged pool
+ * Suggest card recommendations using a 2-layer pipeline.
+ *
+ * Layer A (parallel): A1 search-based discovery + A2 knowledge-based brainstorm
+ * Layer C: Final selection — pick ~10 cards, write elevator pitches
  *
  * @param {object} deckState — full deck state
  * @param {string} userPrompt — user's request (may be empty)
+ * @param {function} onStatus — optional callback for progress updates
  * @returns {Promise<Array<{name, tag, pitch, sources, edhrecSynergy, combosUnlocked}>>}
  */
-export async function suggestRecommendations(deckState, userPrompt) {
+export async function suggestRecommendations(deckState, userPrompt, onStatus = () => {}) {
   const model = deckState.settings?.model || 'anthropic/claude-sonnet-4';
 
-  // --- LLM Call #1: Query Composition ---
-  const queryPrompt = buildQueryPrompt(deckState, userPrompt);
-  const queryResponse = await callLLM(model, SYSTEM_PROMPT, queryPrompt);
-  const queries = parseJSON(queryResponse);
+  // ============================================================
+  // LAYER A — Initial Discovery (parallel: A1 search + A2 brainstorm)
+  // ============================================================
+  onStatus('Searching for cards...');
 
-  if (!queries || !queries.scryfallQueries) {
-    throw new Error('AI failed to generate search queries. Try again.');
+  // A1: Search-based discovery
+  async function runA1() {
+    const queryPrompt = buildQueryPrompt(deckState, userPrompt);
+    const queryResponse = await callLLM(model, SYSTEM_PROMPT, queryPrompt);
+    const queries = parseJSON(queryResponse);
+
+    if (!queries || !queries.scryfallQueries) {
+      throw new Error('AI failed to generate search queries.');
+    }
+
+    const [scryfallResult, edhrecResult, spellbookResult] = await Promise.allSettled([
+      fetchScryfallPool(queries.scryfallQueries),
+      filterEdhrecPool(deckState.edhrecData, queries.edhrecFilter || ''),
+      fetchSpellbookNearMiss(deckState),
+    ]);
+
+    const scryfallCards = scryfallResult.status === 'fulfilled' ? scryfallResult.value : [];
+    const edhrecCards = edhrecResult.status === 'fulfilled' ? edhrecResult.value : [];
+    const spellbookCards = spellbookResult.status === 'fulfilled' ? spellbookResult.value : [];
+
+    return { scryfallCards, edhrecCards, spellbookCards };
   }
 
-  // --- Parallel Fetch ---
-  const [scryfallResults, edhrecResults, spellbookResults] = await Promise.allSettled([
-    fetchScryfallPool(queries.scryfallQueries),
-    filterEdhrecPool(deckState.edhrecData, queries.edhrecFilter || ''),
-    fetchSpellbookNearMiss(deckState),
-  ]);
+  // A2: Knowledge-based brainstorm
+  async function runA2() {
+    const brainstormPrompt = buildBrainstormPrompt(deckState, userPrompt);
+    const brainstormResponse = await callLLM(model, SYSTEM_PROMPT_A2, brainstormPrompt);
+    const brainstorm = parseJSON(brainstormResponse);
 
-  const scryfallCards = scryfallResults.status === 'fulfilled' ? scryfallResults.value : [];
-  const edhrecCards = edhrecResults.status === 'fulfilled' ? edhrecResults.value : [];
-  const spellbookCards = spellbookResults.status === 'fulfilled' ? spellbookResults.value : [];
+    if (!brainstorm?.cards?.length) return [];
 
-  // --- Merge + Deduplicate ---
-  const pool = mergeCardPool(scryfallCards, edhrecCards, spellbookCards, deckState);
+    const names = brainstorm.cards.map(c => c.name);
+    const { found } = await fuzzyLookup(names);
+
+    return found.map(c => ({
+      name: c.name,
+      scryfallData: c,
+      sources: ['brainstorm'],
+      edhrecSynergy: null,
+      edhrecInclusion: null,
+      salt: null,
+      combosUnlocked: [],
+      comboDescription: '',
+    }));
+  }
+
+  const [a1Result, a2Result] = await Promise.allSettled([runA1(), runA2()]);
+
+  // A1 is required; A2 is optional
+  if (a1Result.status === 'rejected') {
+    throw new Error(a1Result.reason?.message || 'Search failed. Try again.');
+  }
+
+  const a1 = a1Result.value;
+  const a2Cards = a2Result.status === 'fulfilled' ? a2Result.value : [];
+
+  // Merge all sources into a single pool
+  const pool = mergeCardPool(
+    [...a1.scryfallCards, ...a2Cards],
+    a1.edhrecCards,
+    a1.spellbookCards,
+    deckState,
+  );
 
   if (pool.length === 0) {
     throw new Error('No cards found. Try a different prompt.');
   }
 
-  // --- LLM Call #2: Selection ---
+  // ============================================================
+  // LAYER C — Final Selection
+  // ============================================================
+  onStatus('AI is selecting the best cards...');
+
   const selectionPrompt = buildSelectionPrompt(deckState, userPrompt, pool);
   const selectionResponse = await callLLM(model, SYSTEM_PROMPT, selectionPrompt);
   const selection = parseJSON(selectionResponse);
 
-  if (!selection || !selection.cards || !Array.isArray(selection.cards)) {
+  if (!selection?.cards?.length) {
     throw new Error('AI failed to select cards. Try again.');
   }
 
@@ -348,6 +421,32 @@ Respond with JSON:
   "type": "cuts",
   "cards": [
     {"name": "Exact Card Name", "reason": "1-2 sentence explanation of why to cut this card."}
+  ]
+}`;
+}
+
+function buildBrainstormPrompt(deckState, userPrompt) {
+  const commander = deckState.commander;
+  const ci = commander?.colorIdentity?.join('') || '';
+  const skipped = (deckState.skippedRecommendations || []).map(c => c.name || c).join(', ') || 'None';
+  const considering = (deckState.considering || []).map(c => c.name || c).join(', ') || 'None';
+
+  return `Commander: ${commander?.name || 'Unknown'} (color identity: ${ci})
+Strategy notes: ${deckState.strategy?.notes || 'None'}
+Budget cap: ${deckState.strategy?.budgetCap ? '$' + deckState.strategy.budgetCap + ' per card' : 'None'}
+
+Cards previously suggested and passed on (do NOT suggest these): ${skipped}
+Cards under consideration (already being evaluated): ${considering}
+
+USER QUERY: "${userPrompt || 'general recommendations for this commander'}"
+
+Brainstorm 15-30 real Magic: The Gathering card names that match this query and are legal in Commander with color identity ${ci || 'colorless'}. Think laterally — flavor, characters, cultural references, Universes Beyond, Secret Lair, art themes, mechanical flavor. Go beyond the obvious.
+
+Respond with JSON:
+{
+  "type": "brainstorm",
+  "cards": [
+    {"name": "Exact Card Name", "reasoning": "brief reason this matches the query"}
   ]
 }`;
 }
